@@ -20,7 +20,7 @@ function createDefaultPresets(): TimePreset[] {
   return [
     {
       id: 'normal',
-      name: '通常日課',
+      name: '通常日程',
       slots: {
         '1': { label: '1時限', start: '08:45', end: '09:35' },
         '2': { label: '2時限', start: '09:45', end: '10:35' },
@@ -32,21 +32,34 @@ function createDefaultPresets(): TimePreset[] {
       },
     },
     {
-      id: 'short',
-      name: '短縮日課',
+      id: '35min',
+      name: '35分授業',
       slots: {
-        '1': { label: '1時限', start: '08:45', end: '09:25' },
-        '2': { label: '2時限', start: '09:35', end: '10:15' },
-        '3': { label: '3時限', start: '10:25', end: '11:05' },
-        '4': { label: '4時限', start: '11:15', end: '11:55' },
-        '5': { label: '5時限', start: '12:45', end: '13:25' },
-        '6': { label: '6時限', start: '13:35', end: '14:15' },
-        '放課後': { label: '放課後', start: '14:25', end: '15:15' },
+        '1': { label: '1時限', start: '08:45', end: '09:20' },
+        '2': { label: '2時限', start: '09:25', end: '10:00' },
+        '3': { label: '3時限', start: '10:05', end: '10:40' },
+        '4': { label: '4時限', start: '10:45', end: '11:20' },
+        '5': { label: '5時限', start: '12:10', end: '12:45' },
+        '6': { label: '6時限', start: '12:50', end: '13:25' },
+        '放課後': { label: '放課後', start: '13:35', end: '14:20' },
+      },
+    },
+    {
+      id: '30min',
+      name: '30分授業',
+      slots: {
+        '1': { label: '1時限', start: '08:45', end: '09:15' },
+        '2': { label: '2時限', start: '09:20', end: '09:50' },
+        '3': { label: '3時限', start: '09:55', end: '10:25' },
+        '4': { label: '4時限', start: '10:30', end: '11:00' },
+        '5': { label: '5時限', start: '11:50', end: '12:20' },
+        '6': { label: '6時限', start: '12:25', end: '12:55' },
+        '放課後': { label: '放課後', start: '13:05', end: '13:50' },
       },
     },
     {
       id: 'exam',
-      name: 'テスト日課',
+      name: 'テスト日程',
       slots: {
         '1': { label: '1時限', start: '08:45', end: '09:35' },
         '2': { label: '2時限', start: '09:55', end: '10:45' },
