@@ -127,7 +127,7 @@ export function Calendar({
                 {date.getDate()}
               </div>
               {holiday && <div className="holiday-name">{holiday.name}</div>}
-              {!isWeekend && !isHoliday && (
+              {dayOfWeek !== 0 && !isHoliday && (
                 <select
                   className="day-preset-select"
                   value={config?.presetId || ''}

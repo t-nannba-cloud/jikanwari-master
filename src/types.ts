@@ -4,9 +4,9 @@ export interface TimetableCell {
   room: string
 }
 
-export type DayOfWeek = '月' | '火' | '水' | '木' | '金'
+export type DayOfWeek = '月' | '火' | '水' | '木' | '金' | '土'
 
-export const DAYS: DayOfWeek[] = ['月', '火', '水', '木', '金']
+export const DAYS: DayOfWeek[] = ['月', '火', '水', '木', '金', '土']
 
 export const PERIODS = ['1', '2', '3', '4', '5', '6', '放課後'] as const
 export type Period = (typeof PERIODS)[number]

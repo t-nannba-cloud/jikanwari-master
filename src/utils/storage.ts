@@ -9,9 +9,15 @@ export function loadData(): AppData {
     if (raw) {
       const parsed = JSON.parse(raw)
       const defaults = createDefaultData()
+      const timetable = parsed.timetable ?? defaults.timetable
+      // Migrate: add '土' column if missing from saved data
+      if (timetable && !timetable['土']) {
+        timetable['土'] = defaults.timetable['土']
+      }
       return {
         ...defaults,
         ...parsed,
+        timetable,
         presets: parsed.presets?.length ? parsed.presets : defaults.presets,
       }
     }
