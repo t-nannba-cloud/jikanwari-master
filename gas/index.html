@@ -56,7 +56,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .preset-table input[type=time] { border: 1px solid #ddd; border-radius: 4px; padding: 4px; font-size: 12px; }
 
 .calendar-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px; }
-.calendar-nav button { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 16px; }
+.calendar-nav button:not(.btn) { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 16px; }
 .calendar-title { font-size: 18px; font-weight: 600; }
 .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: #e0e0e0; border-radius: 8px; overflow: hidden; }
 .cal-header { background: #4361ee; color: white; text-align: center; padding: 8px 4px; font-size: 13px; font-weight: 600; }
@@ -493,34 +493,7 @@ function openCellModal(day, period) {
   const viewLabel = activeTimetableView === 'self' ? '自分' : activeTimetableView === 'class1' ? state.classes[1].name : state.classes[0].name;
   document.getElementById('cellModalTitle').textContent = `[${viewLabel}] ${day}曜 ${slot ? slot.label : period+'時限'}`;
   renderSubjectPicker();
-  renderPeriodCopyPicker(day, period);
   document.getElementById('cellModal').style.display = 'flex';
-}
-function renderPeriodCopyPicker(day, period) {
-  const tt = getActiveTimetable();
-  const preset = getActivePreset();
-  const periods = preset ? (preset.visiblePeriods || ALL_PERIODS) : ALL_PERIODS;
-  let html = '';
-  for (const p of periods) {
-    if (p === period) continue;
-    const c = tt[day] && tt[day][p];
-    const subject = c && c.subject ? c.subject : '';
-    const slot = preset && preset.slots ? preset.slots[p] : null;
-    const label = slot ? slot.label : (p === '放課後' ? '放課後' : p + '限');
-    html += `<button class="subject-btn" onclick="copyFromPeriod('${day}','${p}')" title="${label}：${subject||'空'}">${label}${subject ? '（'+subject+'）' : ''}</button>`;
-  }
-  document.getElementById('periodCopyPicker').innerHTML = html || '<span style="font-size:12px;color:#aaa">他の時限がありません</span>';
-}
-function copyFromPeriod(day, fromPeriod) {
-  const tt = getActiveTimetable();
-  const cell = tt[day] && tt[day][fromPeriod];
-  document.getElementById('inputSubject').value = cell ? (cell.subject || '') : '';
-  document.getElementById('inputClass').value = cell ? (cell.className || '') : '';
-  document.getElementById('inputRoom').value = cell ? (cell.room || '') : '';
-  syncSubjectPicker();
-  // highlight copied button
-  document.querySelectorAll('#periodCopyPicker .subject-btn').forEach(b => b.classList.remove('selected'));
-  event.target.classList.add('selected');
 }
 function closeModal() { document.getElementById('cellModal').style.display = 'none'; editingCell = null; }
 function saveCell() {
