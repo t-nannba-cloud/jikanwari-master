@@ -549,8 +549,7 @@ function printMonthly(classIdx) {
       const cell = classTT[dayKey] && classTT[dayKey][period];
       const subject = cell ? cell.subject : '';
       const room = cell ? cell.room : '';
-      const timeStr = slot && slot.start !== slot.end ? `<div style="font-size:10px;color:#888">${slot.start}〜${slot.end}</div>` : '';
-      rowHtml += `<td>${timeStr}${subject ? `<strong>${subject}</strong>` : ''}<br>${room}</td>`;
+      rowHtml += `<td>${subject ? `<strong>${subject}</strong>` : ''}<br>${room}</td>`;
     }
     rowHtml += '</tr>';
     tableRows += rowHtml;
