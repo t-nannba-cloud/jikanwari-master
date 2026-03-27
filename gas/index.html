@@ -536,8 +536,6 @@ function openPeriodMapModal(dateStr) {
   if (!preset) return;
   const periodMap = config.periodMap || {};
   const visiblePeriods = preset.visiblePeriods || ALL_PERIODS.filter(p => p !== '6');
-  const allOptions = visiblePeriods;
-  // Parse date for display
   const parts = dateStr.split('-');
   const dow = new Date(dateStr).getDay();
   const dowName = ['日','月','火','水','木','金','土'][dow];
@@ -546,19 +544,36 @@ function openPeriodMapModal(dateStr) {
   for (const period of visiblePeriods) {
     const slot = preset.slots[period];
     const label = slot ? slot.label : period + '限';
-    const current = periodMap[period] || period;
-    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <span style="min-width:60px;font-size:13px;font-weight:600">${label}枠</span>
-      <select id="pmap_${period}" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">`;
-    for (const opt of allOptions) {
+    const mapVal = periodMap[period];
+    const isCustom = mapVal && typeof mapVal === 'object';
+    const currentSel = isCustom ? '__custom__' : (mapVal || period);
+    const customSubject = isCustom ? (mapVal.subject || '') : '';
+    const customRoom = isCustom ? (mapVal.room || '') : '';
+    html += `<div style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="min-width:60px;font-size:13px;font-weight:600">${label}枠</span>
+        <select id="pmap_${period}" onchange="onPeriodMapChange('${period}')" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">`;
+    for (const opt of visiblePeriods) {
       const optSlot = preset.slots[opt];
       const optLabel = optSlot ? optSlot.label : opt + '限';
-      html += `<option value="${opt}" ${current===opt?'selected':''}>${optLabel}の内容</option>`;
+      html += `<option value="${opt}" ${currentSel===opt?'selected':''}>${optLabel}の内容</option>`;
     }
-    html += `</select></div>`;
+    html += `<option value="__custom__" ${isCustom?'selected':''}>記述式</option>
+        </select>
+      </div>
+      <div id="pmap_custom_${period}" style="margin-top:6px;margin-left:68px;display:${isCustom?'flex':'none'};gap:6px">
+        <input type="text" id="pmap_subject_${period}" placeholder="教科名" value="${customSubject}" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+        <input type="text" id="pmap_room_${period}" placeholder="場所" value="${customRoom}" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+      </div>
+    </div>`;
   }
   document.getElementById('periodMapBody').innerHTML = html;
   document.getElementById('periodMapModal').style.display = 'flex';
+}
+function onPeriodMapChange(period) {
+  const sel = document.getElementById('pmap_' + period);
+  const customDiv = document.getElementById('pmap_custom_' + period);
+  if (customDiv) customDiv.style.display = sel.value === '__custom__' ? 'flex' : 'none';
 }
 function closePeriodMapModal() {
   document.getElementById('periodMapModal').style.display = 'none';
@@ -573,7 +588,16 @@ function savePeriodMap() {
   let hasChange = false;
   for (const period of visiblePeriods) {
     const el = document.getElementById('pmap_' + period);
-    if (el && el.value !== period) { periodMap[period] = el.value; hasChange = true; }
+    if (!el) continue;
+    if (el.value === '__custom__') {
+      const subject = (document.getElementById('pmap_subject_' + period) || {}).value || '';
+      const room = (document.getElementById('pmap_room_' + period) || {}).value || '';
+      periodMap[period] = { subject: subject.trim(), room: room.trim() };
+      hasChange = true;
+    } else if (el.value !== period) {
+      periodMap[period] = el.value;
+      hasChange = true;
+    }
   }
   config.periodMap = hasChange ? periodMap : {};
   saveState(); closePeriodMapModal(); renderCalendar();
@@ -652,8 +676,10 @@ function printMonthly(classIdx) {
     let rowHtml = `<tr><td style="white-space:nowrap">${calMonth}/${d}（${dayName}）${mapNote}</td><td>${preset ? preset.name : '−'}</td>`;
     for (const period of ALL_PRINT_PERIODS) {
       if (!preset || !visiblePeriods.includes(period)) { rowHtml += `<td style="color:#ccc">−</td>`; continue; }
-      const srcPeriod = periodMap && periodMap[period] ? periodMap[period] : period;
-      const cell = classTT[dayKey] && classTT[dayKey][srcPeriod];
+      const mapVal = periodMap && periodMap[period];
+      const cell = (mapVal && typeof mapVal === 'object')
+        ? mapVal
+        : (classTT[dayKey] && classTT[dayKey][mapVal || period]);
       const subject = cell ? cell.subject : '';
       const room = cell ? cell.room : '';
       rowHtml += `<td>${subject ? `<strong>${subject}</strong>` : ''}<br>${room}</td>`;

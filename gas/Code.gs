@@ -58,8 +58,10 @@ function createCalendarEvents(jsonStr) {
         const slot = preset.slots && preset.slots[period];
         if (!slot || !slot.start || slot.start === slot.end) continue;
 
-        const srcPeriod = periodMap[period] || period;
-        const cell = state.timetable[dayKey] && state.timetable[dayKey][srcPeriod];
+        const mapVal = periodMap[period];
+        const cell = (mapVal && typeof mapVal === 'object')
+          ? mapVal
+          : (state.timetable[dayKey] && state.timetable[dayKey][mapVal || period]);
         const subject = cell && cell.subject ? cell.subject : slot.label;
         const room = cell && cell.room ? cell.room : '';
         const className = cell && cell.className ? cell.className : '';
