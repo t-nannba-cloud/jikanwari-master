@@ -37,7 +37,7 @@ function createDefaultPresets(): TimePreset[] {
     {
       id: '35min',
       name: '35分日程',
-      visiblePeriods: ['1', '2', '3', '4', '放課後'],
+      visiblePeriods: ['1', '2', '3', '4', '5'],
       slots: {
         // 学活17:30-17:35、休憩17:35-17:40
         '1': { label: '1時限', start: '17:40', end: '18:15' },
@@ -45,15 +45,15 @@ function createDefaultPresets(): TimePreset[] {
         '2': { label: '2時限', start: '18:45', end: '19:20' },
         '3': { label: '3時限', start: '19:25', end: '20:00' },
         '4': { label: '4時限', start: '20:05', end: '20:40' },
-        '5': { label: '5時限', start: '20:40', end: '20:40' },
+        '5': { label: '5時限', start: '20:40', end: '21:00' },
         '6': { label: '6時限', start: '20:40', end: '20:40' },
-        '放課後': { label: '放課後', start: '20:40', end: '21:00' },
+        '放課後': { label: '放課後', start: '20:40', end: '20:40' },
       },
     },
     {
       id: '30min',
       name: '30分授業',
-      visiblePeriods: ['1', '2', '3', '4', '放課後'],
+      visiblePeriods: ['1', '2', '3', '4', '5'],
       slots: {
         // 学活17:30-17:35、休憩17:35-17:40
         '1': { label: '1時限', start: '17:40', end: '18:10' },
@@ -61,9 +61,9 @@ function createDefaultPresets(): TimePreset[] {
         '2': { label: '2時限', start: '18:40', end: '19:10' },
         '3': { label: '3時限', start: '19:15', end: '19:45' },
         '4': { label: '4時限', start: '19:50', end: '20:20' },
-        '5': { label: '5時限', start: '20:20', end: '20:20' },
+        '5': { label: '5時限', start: '20:20', end: '21:00' },
         '6': { label: '6時限', start: '20:20', end: '20:20' },
-        '放課後': { label: '放課後', start: '20:20', end: '21:00' },
+        '放課後': { label: '放課後', start: '20:20', end: '20:20' },
       },
     },
     {
