@@ -342,7 +342,7 @@ function renderCalendar() {
     html += `<div class="legend-item"><div class="legend-dot ${presetColor(i)}"></div><span>${state.presets[i].name}</span></div>`;
   }
   html += '</div>';
-  html += `<div class="calendar-nav"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button></div>`;
+  html += `<div class="calendar-nav"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button><button class="btn btn-primary" onclick="printMonthly()" style="margin-left:12px;font-size:13px">今月の予定を出力</button></div>`;
   html += '<div class="calendar-grid">';
   ['日','月','火','水','木','金','土'].forEach((d,i) => {
     html += `<div class="cal-header ${i===0?'sun':i===6?'sat':''}">${d}</div>`;
@@ -430,6 +430,80 @@ function setDayPreset(dateStr, presetId) {
 }
 function calPrev() { if(calMonth===1){calMonth=12;calYear--;}else calMonth--; renderCalendar(); }
 function calNext() { if(calMonth===12){calMonth=1;calYear++;}else calMonth++; renderCalendar(); }
+
+function printMonthly() {
+  const DOW_NAMES = ['日','月','火','水','木','金','土'];
+  const firstDay = new Date(calYear, calMonth-1, 1);
+  const lastDay = new Date(calYear, calMonth, 0);
+  // Collect all days with a preset
+  const rows = [];
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const date = new Date(calYear, calMonth-1, d);
+    const dow = date.getDay();
+    if (dow === 0) continue; // skip Sunday
+    const dateStr = formatDate(date);
+    const config = state.calendarConfig[dateStr];
+    const presetId = config && config.presetId;
+    const preset = presetId ? state.presets.find(p => p.id === presetId) : null;
+    rows.push({ d, dow, dateStr, preset });
+  }
+
+  // Determine which periods to show (union of all visible periods used)
+  const ALL_PRINT_PERIODS = ['1','2','3','4','5','放課後'];
+
+  let tableRows = '';
+  for (const row of rows) {
+    const { d, dow, preset } = row;
+    const dayName = DOW_NAMES[dow];
+    const dayKey = ['','月','火','水','木','金','土'][dow];
+    const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PRINT_PERIODS) : null;
+    let rowHtml = `<tr>
+      <td style="white-space:nowrap">${calMonth}/${d}（${dayName}）</td>
+      <td>${preset ? preset.name : '−'}</td>`;
+    for (const period of ALL_PRINT_PERIODS) {
+      if (!preset || !visiblePeriods.includes(period)) {
+        rowHtml += `<td style="color:#ccc">−</td>`;
+        continue;
+      }
+      const slot = preset.slots[period];
+      const cell = state.timetable[dayKey] && state.timetable[dayKey][period];
+      const subject = cell ? cell.subject : '';
+      const room = cell ? cell.room : '';
+      const timeStr = slot && slot.start !== slot.end ? `<div style="font-size:10px;color:#888">${slot.start}〜${slot.end}</div>` : '';
+      rowHtml += `<td>${timeStr}${subject ? `<strong>${subject}</strong>` : ''}<br>${room}</td>`;
+    }
+    rowHtml += '</tr>';
+    tableRows += rowHtml;
+  }
+
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>${calYear}年${calMonth}月 時間割</title>
+<style>
+body { font-family: -apple-system, sans-serif; font-size: 12px; margin: 16px; }
+h2 { margin-bottom: 12px; font-size: 16px; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ccc; padding: 5px 7px; vertical-align: top; text-align: center; }
+th { background: #4361ee; color: white; }
+tr:nth-child(even) td { background: #f8f9ff; }
+.sat th, .sat td { color: #2255cc; }
+@media print { button { display:none; } }
+</style>
+</head><body>
+<h2>${calYear}年${calMonth}月 時間割</h2>
+<button onclick="window.print()" style="margin-bottom:12px;padding:6px 16px;background:#4361ee;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">印刷する</button>
+<table>
+<thead><tr>
+  <th>日付</th><th>日程</th>
+  <th>1時限</th><th>2時限</th><th>3時限</th><th>4時限</th><th>5時限</th><th>放課後</th>
+</tr></thead>
+<tbody>${tableRows}</tbody>
+</table>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
 function addSubject() {
   const input = document.getElementById('newSubjectInput');
   const name = input.value.trim();
