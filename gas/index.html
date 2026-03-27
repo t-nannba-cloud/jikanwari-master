@@ -524,7 +524,7 @@ function printMonthly(classIdx) {
   const lastDay = new Date(calYear, calMonth, 0);
   const classTT = state.classes[classIdx].timetable;
   const className = state.classes[classIdx].name;
-  const ALL_PRINT_PERIODS = ['1','2','3','4','5','放課後'];
+  const ALL_PRINT_PERIODS = ['1','2','3','4','5'];
   const rows = [];
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const date = new Date(calYear, calMonth-1, d);
@@ -561,7 +561,7 @@ function printMonthly(classIdx) {
 </head><body>
 <h2>${calYear}年${calMonth}月 ${className} 時間割</h2>
 <button onclick="window.print()" style="margin-bottom:12px;padding:6px 16px;background:#4361ee;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">印刷する</button>
-<table><thead><tr><th>日付</th><th>日程</th><th>1時限</th><th>2時限</th><th>3時限</th><th>4時限</th><th>5時限</th><th>放課後</th></tr></thead>
+<table><thead><tr><th>日付</th><th>日程</th><th>1時限</th><th>2時限</th><th>3時限</th><th>4時限</th><th>5時限</th></tr></thead>
 <tbody>${tableRows}</tbody></table></body></html>`;
   const w = window.open('', '_blank');
   w.document.write(html);
