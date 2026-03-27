@@ -217,11 +217,12 @@ function createEmptyTimetable() {
 const DEFAULT_SUBJECTS = ['国語','算数','数学','理科','社会','英語','音楽','体育','図工','美術','家庭','技術','道徳','総合','学活','自習'];
 
 function createDefaultData() {
-  return { timetable: createEmptyTimetable(), presets: DEFAULT_PRESETS, calendarConfig: {}, activePresetId: 'normal', subjects: DEFAULT_SUBJECTS.slice() };
+  return { timetable: createEmptyTimetable(), classTimetable: createEmptyTimetable(), presets: DEFAULT_PRESETS, calendarConfig: {}, activePresetId: 'normal', subjects: DEFAULT_SUBJECTS.slice() };
 }
 
 let state = createDefaultData();
 let currentTab = 'timetable';
+let activeTimetableView = 'class'; // 'self' or 'class'
 let newSubjectInput = '';
 let editingCell = null;
 let calYear = new Date().getFullYear();
@@ -236,6 +237,7 @@ function init() {
           state = Object.assign(createDefaultData(), loaded);
           if (!state.presets || !state.presets.length) state.presets = DEFAULT_PRESETS;
           if (!state.subjects || !state.subjects.length) state.subjects = DEFAULT_SUBJECTS.slice();
+          if (!state.classTimetable) state.classTimetable = createEmptyTimetable();
         } catch(e) { state = createDefaultData(); }
       }
       render();
@@ -280,7 +282,14 @@ function render() {
 function renderTimetable() {
   const preset = getActivePreset();
   const periods = preset ? (preset.visiblePeriods || ALL_PERIODS) : ALL_PERIODS;
-  let html = '<div class="timetable-wrap"><table class="timetable"><thead><tr><th class="period-cell">時限</th>';
+  const tt = activeTimetableView === 'self' ? state.timetable : state.classTimetable;
+  const label = activeTimetableView === 'self' ? '自分の時間割' : 'クラスの時間割';
+  let html = `<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+    <span style="font-size:13px;color:#666">表示：</span>
+    <button class="btn ${activeTimetableView==='class'?'btn-primary':'btn-secondary'}" onclick="switchTimetableView('class')">クラスの時間割</button>
+    <button class="btn ${activeTimetableView==='self'?'btn-primary':'btn-secondary'}" onclick="switchTimetableView('self')">自分の時間割</button>
+  </div>`;
+  html += '<div class="timetable-wrap"><table class="timetable"><thead><tr><th class="period-cell">時限</th>';
   for (const day of DAYS) html += `<th>${day}</th>`;
   html += '</tr></thead><tbody>';
   for (const period of periods) {
@@ -290,7 +299,7 @@ function renderTimetable() {
     if (slot && slot.start && slot.start !== slot.end) html += `<div class="period-time">${slot.start}〜${slot.end}</div>`;
     html += '</td>';
     for (const day of DAYS) {
-      const cell = state.timetable[day] && state.timetable[day][period];
+      const cell = tt[day] && tt[day][period];
       const isEmpty = !cell || (!cell.subject && !cell.className && !cell.room);
       html += `<td><div class="cell ${isEmpty?'empty':''}" onclick="openCellModal('${day}','${period}')">`;
       if (isEmpty) html += '+';
@@ -305,6 +314,11 @@ function renderTimetable() {
   }
   html += '</tbody></table></div>';
   document.getElementById('tab-timetable').innerHTML = html;
+}
+
+function switchTimetableView(view) {
+  activeTimetableView = view;
+  renderTimetable();
 }
 
 function renderPresets() {
@@ -395,15 +409,20 @@ function syncSubjectPicker() {
     b.classList.toggle('selected', b.textContent === current);
   });
 }
+function getActiveTimetable() {
+  return activeTimetableView === 'self' ? state.timetable : state.classTimetable;
+}
 function openCellModal(day, period) {
   editingCell = {day, period};
-  const cell = state.timetable[day] && state.timetable[day][period];
+  const tt = getActiveTimetable();
+  const cell = tt[day] && tt[day][period];
   document.getElementById('inputSubject').value = cell ? cell.subject : '';
   document.getElementById('inputClass').value = cell ? cell.className : '';
   document.getElementById('inputRoom').value = cell ? cell.room : '';
   const preset = getActivePreset();
   const slot = preset && preset.slots ? preset.slots[period] : null;
-  document.getElementById('cellModalTitle').textContent = `${day}曜 ${slot ? slot.label : period+'時限'}`;
+  const viewLabel = activeTimetableView === 'self' ? '自分' : 'クラス';
+  document.getElementById('cellModalTitle').textContent = `[${viewLabel}] ${day}曜 ${slot ? slot.label : period+'時限'}`;
   renderSubjectPicker();
   document.getElementById('cellModal').style.display = 'flex';
 }
@@ -411,8 +430,9 @@ function closeModal() { document.getElementById('cellModal').style.display = 'no
 function saveCell() {
   if (!editingCell) return;
   const {day, period} = editingCell;
-  if (!state.timetable[day]) state.timetable[day] = {};
-  state.timetable[day][period] = {
+  const tt = getActiveTimetable();
+  if (!tt[day]) tt[day] = {};
+  tt[day][period] = {
     subject: document.getElementById('inputSubject').value.trim(),
     className: document.getElementById('inputClass').value.trim(),
     room: document.getElementById('inputRoom').value.trim(),
@@ -422,7 +442,8 @@ function saveCell() {
 function clearCell() {
   if (!editingCell) return;
   const {day, period} = editingCell;
-  if (state.timetable[day]) state.timetable[day][period] = {subject:'',className:'',room:''};
+  const tt = getActiveTimetable();
+  if (tt[day]) tt[day][period] = {subject:'',className:'',room:''};
   closeModal(); render(); saveState();
 }
 function setDayPreset(dateStr, presetId) {
@@ -456,7 +477,7 @@ function syncToCalendar() {
   if (!confirm(calYear + '年' + calMonth + '月の予定（' + days + '日分）をGoogleカレンダーに追加します。\nよろしいですか？')) return;
 
   showToast('追加中...', 30000);
-  const payload = JSON.stringify({ year: calYear, month: calMonth, state: state });
+  const payload = JSON.stringify({ year: calYear, month: calMonth, state: { timetable: state.classTimetable, presets: state.presets, calendarConfig: state.calendarConfig } });
   google.script.run
     .withSuccessHandler(function(result) {
       if (result.success) {
@@ -506,7 +527,7 @@ function printMonthly() {
         continue;
       }
       const slot = preset.slots[period];
-      const cell = state.timetable[dayKey] && state.timetable[dayKey][period];
+      const cell = state.classTimetable[dayKey] && state.classTimetable[dayKey][period];
       const subject = cell ? cell.subject : '';
       const room = cell ? cell.room : '';
       const timeStr = slot && slot.start !== slot.end ? `<div style="font-size:10px;color:#888">${slot.start}〜${slot.end}</div>` : '';
