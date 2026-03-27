@@ -114,6 +114,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <div id="toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:white;padding:10px 20px;border-radius:8px;font-size:14px;z-index:2000;white-space:nowrap"></div>
 
+<div class="modal-overlay" id="periodMapModal" style="display:none">
+  <div class="modal" style="max-width:420px">
+    <h3 id="periodMapTitle">時間割変更</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:12px">各枠に表示する時限の内容を選んでください</p>
+    <div id="periodMapBody"></div>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closePeriodMapModal()">キャンセル</button>
+      <button class="btn btn-danger" onclick="clearPeriodMap()">変更をリセット</button>
+      <button class="btn btn-primary" onclick="savePeriodMap()">保存</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="cellModal" style="display:none">
   <div class="modal">
     <h3 id="cellModalTitle">授業を編集</h3>
@@ -406,6 +419,10 @@ function renderCalendar() {
         html += `<option value="${p.id}" ${config&&config.presetId===p.id?'selected':''}>${p.name}</option>`;
       }
       html += '</select>';
+      if (config && config.presetId) {
+        const hasMap = config.periodMap && Object.keys(config.periodMap).length > 0;
+        html += `<div onclick="openPeriodMapModal('${dateStr}')" style="font-size:10px;color:${hasMap?'#e63946':'#4361ee'};cursor:pointer;margin-top:2px">${hasMap?'⚡変更中':'＋変更'}</div>`;
+      }
     }
     html += '</div>';
   }
@@ -507,7 +524,64 @@ function clearCell() {
 function setDayPreset(dateStr, presetId) {
   if (!state.calendarConfig[dateStr]) state.calendarConfig[dateStr] = {};
   state.calendarConfig[dateStr].presetId = presetId || null;
+  if (!presetId) delete state.calendarConfig[dateStr].periodMap;
   saveState(); renderCalendar();
+}
+
+let editingDateStr = null;
+function openPeriodMapModal(dateStr) {
+  editingDateStr = dateStr;
+  const config = state.calendarConfig[dateStr];
+  const preset = config && config.presetId ? state.presets.find(p => p.id === config.presetId) : null;
+  if (!preset) return;
+  const periodMap = config.periodMap || {};
+  const visiblePeriods = preset.visiblePeriods || ALL_PERIODS.filter(p => p !== '6');
+  const allOptions = visiblePeriods;
+  // Parse date for display
+  const parts = dateStr.split('-');
+  const dow = new Date(dateStr).getDay();
+  const dowName = ['日','月','火','水','木','金','土'][dow];
+  document.getElementById('periodMapTitle').textContent = `${parseInt(parts[1])}/${parseInt(parts[2])}（${dowName}）の時間割変更`;
+  let html = '';
+  for (const period of visiblePeriods) {
+    const slot = preset.slots[period];
+    const label = slot ? slot.label : period + '限';
+    const current = periodMap[period] || period;
+    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="min-width:60px;font-size:13px;font-weight:600">${label}枠</span>
+      <select id="pmap_${period}" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">`;
+    for (const opt of allOptions) {
+      const optSlot = preset.slots[opt];
+      const optLabel = optSlot ? optSlot.label : opt + '限';
+      html += `<option value="${opt}" ${current===opt?'selected':''}>${optLabel}の内容</option>`;
+    }
+    html += `</select></div>`;
+  }
+  document.getElementById('periodMapBody').innerHTML = html;
+  document.getElementById('periodMapModal').style.display = 'flex';
+}
+function closePeriodMapModal() {
+  document.getElementById('periodMapModal').style.display = 'none';
+  editingDateStr = null;
+}
+function savePeriodMap() {
+  if (!editingDateStr) return;
+  const config = state.calendarConfig[editingDateStr];
+  const preset = state.presets.find(p => p.id === config.presetId);
+  const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PERIODS.filter(p => p !== '6')) : [];
+  const periodMap = {};
+  let hasChange = false;
+  for (const period of visiblePeriods) {
+    const el = document.getElementById('pmap_' + period);
+    if (el && el.value !== period) { periodMap[period] = el.value; hasChange = true; }
+  }
+  config.periodMap = hasChange ? periodMap : {};
+  saveState(); closePeriodMapModal(); renderCalendar();
+}
+function clearPeriodMap() {
+  if (!editingDateStr) return;
+  if (state.calendarConfig[editingDateStr]) delete state.calendarConfig[editingDateStr].periodMap;
+  saveState(); closePeriodMapModal(); renderCalendar();
 }
 function calPrev() { if(calMonth===1){calMonth=12;calYear--;}else calMonth--; renderCalendar(); }
 function calNext() { if(calMonth===12){calMonth=1;calYear++;}else calMonth++; renderCalendar(); }
@@ -535,7 +609,7 @@ function syncToCalendar() {
   if (!confirm(calYear + '年' + calMonth + '月の予定（' + days + '日分）をGoogleカレンダーに追加します。\nよろしいですか？')) return;
 
   showToast('追加中...', 30000);
-  const payload = JSON.stringify({ year: calYear, month: calMonth, state: { timetable: state.timetable, presets: state.presets, calendarConfig: state.calendarConfig } });
+  const payload = JSON.stringify({ year: calYear, month: calMonth, state: { timetable: state.timetable, presets: state.presets, calendarConfig: state.calendarConfig } }); // calendarConfig includes periodMap
   google.script.run
     .withSuccessHandler(function(result) {
       if (result.success) {
@@ -565,19 +639,21 @@ function printMonthly(classIdx) {
     const config = state.calendarConfig[dateStr];
     const presetId = config && config.presetId;
     const preset = presetId ? state.presets.find(p => p.id === presetId) : null;
-    rows.push({ d, dow, preset });
+    const periodMap = config && config.periodMap ? config.periodMap : {};
+    rows.push({ d, dow, preset, periodMap });
   }
   let tableRows = '';
   for (const row of rows) {
-    const { d, dow, preset } = row;
+    const { d, dow, preset, periodMap } = row;
     const dayName = DOW_NAMES[dow];
     const dayKey = ['','月','火','水','木','金','土'][dow];
     const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PRINT_PERIODS) : null;
-    let rowHtml = `<tr><td style="white-space:nowrap">${calMonth}/${d}（${dayName}）</td><td>${preset ? preset.name : '−'}</td>`;
+    const mapNote = periodMap && Object.keys(periodMap).length > 0 ? '⚡' : '';
+    let rowHtml = `<tr><td style="white-space:nowrap">${calMonth}/${d}（${dayName}）${mapNote}</td><td>${preset ? preset.name : '−'}</td>`;
     for (const period of ALL_PRINT_PERIODS) {
       if (!preset || !visiblePeriods.includes(period)) { rowHtml += `<td style="color:#ccc">−</td>`; continue; }
-      const slot = preset.slots[period];
-      const cell = classTT[dayKey] && classTT[dayKey][period];
+      const srcPeriod = periodMap && periodMap[period] ? periodMap[period] : period;
+      const cell = classTT[dayKey] && classTT[dayKey][srcPeriod];
       const subject = cell ? cell.subject : '';
       const room = cell ? cell.room : '';
       rowHtml += `<td>${subject ? `<strong>${subject}</strong>` : ''}<br>${room}</td>`;

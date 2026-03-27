@@ -51,13 +51,15 @@ function createCalendarEvents(jsonStr) {
 
       const dayKey = DOW_KEYS[dow];
       const visiblePeriods = preset.visiblePeriods || ['1','2','3','4','5','6','放課後'];
+      const periodMap = config.periodMap || {};
 
       for (let pi = 0; pi < visiblePeriods.length; pi++) {
         const period = visiblePeriods[pi];
         const slot = preset.slots && preset.slots[period];
         if (!slot || !slot.start || slot.start === slot.end) continue;
 
-        const cell = state.timetable[dayKey] && state.timetable[dayKey][period];
+        const srcPeriod = periodMap[period] || period;
+        const cell = state.timetable[dayKey] && state.timetable[dayKey][srcPeriod];
         const subject = cell && cell.subject ? cell.subject : slot.label;
         const room = cell && cell.room ? cell.room : '';
         const className = cell && cell.className ? cell.className : '';
