@@ -28,7 +28,11 @@ function createCalendarEvents(jsonStr) {
   try {
     const data = JSON.parse(jsonStr);
     const { year, month, state } = data;
-    const calendar = CalendarApp.getDefaultCalendar();
+    const calendars = CalendarApp.getCalendarsByName('授業');
+    if (!calendars || calendars.length === 0) {
+      return { success: false, error: '「授業」という名前のカレンダーが見つかりません' };
+    }
+    const calendar = calendars[0];
     const DOW_KEYS = ['', '月', '火', '水', '木', '金', '土'];
     const lastDay = new Date(year, month, 0).getDate();
     let count = 0;
