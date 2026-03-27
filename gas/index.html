@@ -75,6 +75,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 .c0{background:#4361ee} .c1{background:#e63946} .c2{background:#2ec4b6} .c3{background:#ff9f1c} .c4{background:#9d4edd}
 
+.subject-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.subject-btn { padding: 6px 12px; border: 1px solid #4361ee; border-radius: 20px; background: white; color: #4361ee; cursor: pointer; font-size: 13px; }
+.subject-btn:hover, .subject-btn.selected { background: #4361ee; color: white; }
+
+.subject-manager { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 12px; }
+.subject-manager h3 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+.subject-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.subject-tag { display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f0f4ff; border-radius: 20px; font-size: 13px; }
+.subject-tag button { background: none; border: none; cursor: pointer; color: #999; font-size: 15px; line-height: 1; padding: 0; }
+.subject-add { display: flex; gap: 8px; }
+.subject-add input { flex: 1; padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+
 @media (max-width: 600px) {
   .content { padding: 8px; }
   .header h1 { font-size: 16px; }
@@ -105,7 +117,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <h3 id="cellModalTitle">授業を編集</h3>
     <div class="form-group">
       <label>教科</label>
-      <input type="text" id="inputSubject" placeholder="例：数学">
+      <div class="subject-picker" id="subjectPicker"></div>
+      <input type="text" id="inputSubject" placeholder="例：数学" oninput="syncSubjectPicker()">
     </div>
     <div class="form-group">
       <label>クラス</label>
@@ -199,12 +212,15 @@ function createEmptyTimetable() {
   return t;
 }
 
+const DEFAULT_SUBJECTS = ['国語','算数','数学','理科','社会','英語','音楽','体育','図工','美術','家庭','技術','道徳','総合','学活','自習'];
+
 function createDefaultData() {
-  return { timetable: createEmptyTimetable(), presets: DEFAULT_PRESETS, calendarConfig: {}, activePresetId: 'normal' };
+  return { timetable: createEmptyTimetable(), presets: DEFAULT_PRESETS, calendarConfig: {}, activePresetId: 'normal', subjects: DEFAULT_SUBJECTS.slice() };
 }
 
 let state = createDefaultData();
 let currentTab = 'timetable';
+let newSubjectInput = '';
 let editingCell = null;
 let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth() + 1;
@@ -217,6 +233,7 @@ function init() {
           const loaded = JSON.parse(result.data);
           state = Object.assign(createDefaultData(), loaded);
           if (!state.presets || !state.presets.length) state.presets = DEFAULT_PRESETS;
+          if (!state.subjects || !state.subjects.length) state.subjects = DEFAULT_SUBJECTS.slice();
         } catch(e) { state = createDefaultData(); }
       }
       render();
@@ -289,7 +306,14 @@ function renderTimetable() {
 }
 
 function renderPresets() {
-  let html = '<div class="preset-selector"><label>現在のプリセット：</label><select onchange="setActivePreset(this.value)">';
+  let html = '<div class="subject-manager"><h3>教科プリセット</h3><div class="subject-tags">';
+  for (let i = 0; i < state.subjects.length; i++) {
+    const s = state.subjects[i].replace(/'/g,"\\'");
+    html += `<div class="subject-tag"><span>${state.subjects[i]}</span><button onclick="removeSubject(${i})" title="削除">×</button></div>`;
+  }
+  html += '</div><div class="subject-add"><input type="text" id="newSubjectInput" placeholder="教科名を入力" onkeydown="if(event.key===\'Enter\')addSubject()"><button class="btn btn-primary" onclick="addSubject()">追加</button></div></div>';
+
+  html += '<div class="preset-selector"><label>現在のプリセット：</label><select onchange="setActivePreset(this.value)">';
   for (const p of state.presets) html += `<option value="${p.id}" ${p.id===state.activePresetId?'selected':''}>${p.name}</option>`;
   html += '</select></div><div class="preset-list">';
   const displayPeriods = ALL_PERIODS.filter(p => p !== '6');
@@ -350,6 +374,25 @@ function updateSlot(presetId, period, field, value) {
   const p = state.presets.find(p=>p.id===presetId);
   if (p && p.slots[period]) { p.slots[period][field] = value; saveState(); }
 }
+function renderSubjectPicker() {
+  const current = document.getElementById('inputSubject').value.trim();
+  let html = '';
+  for (const s of state.subjects) {
+    html += `<button class="subject-btn ${s===current?'selected':''}" onclick="selectSubject('${s.replace(/'/g,"\\'")}',this)">${s}</button>`;
+  }
+  document.getElementById('subjectPicker').innerHTML = html;
+}
+function selectSubject(name, btn) {
+  document.getElementById('inputSubject').value = name;
+  document.querySelectorAll('#subjectPicker .subject-btn').forEach(b => b.classList.remove('selected'));
+  if (btn) btn.classList.add('selected');
+}
+function syncSubjectPicker() {
+  const current = document.getElementById('inputSubject').value.trim();
+  document.querySelectorAll('#subjectPicker .subject-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent === current);
+  });
+}
 function openCellModal(day, period) {
   editingCell = {day, period};
   const cell = state.timetable[day] && state.timetable[day][period];
@@ -359,6 +402,7 @@ function openCellModal(day, period) {
   const preset = getActivePreset();
   const slot = preset && preset.slots ? preset.slots[period] : null;
   document.getElementById('cellModalTitle').textContent = `${day}曜 ${slot ? slot.label : period+'時限'}`;
+  renderSubjectPicker();
   document.getElementById('cellModal').style.display = 'flex';
 }
 function closeModal() { document.getElementById('cellModal').style.display = 'none'; editingCell = null; }
@@ -386,6 +430,20 @@ function setDayPreset(dateStr, presetId) {
 }
 function calPrev() { if(calMonth===1){calMonth=12;calYear--;}else calMonth--; renderCalendar(); }
 function calNext() { if(calMonth===12){calMonth=1;calYear++;}else calMonth++; renderCalendar(); }
+function addSubject() {
+  const input = document.getElementById('newSubjectInput');
+  const name = input.value.trim();
+  if (!name || state.subjects.includes(name)) return;
+  state.subjects.push(name);
+  input.value = '';
+  saveState();
+  renderPresets();
+}
+function removeSubject(index) {
+  state.subjects.splice(index, 1);
+  saveState();
+  renderPresets();
+}
 
 init();
 </script>
