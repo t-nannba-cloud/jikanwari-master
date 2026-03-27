@@ -112,6 +112,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <div id="tab-calendar" style="display:none"></div>
 </div>
 
+<div id="toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:white;padding:10px 20px;border-radius:8px;font-size:14px;z-index:2000;white-space:nowrap"></div>
+
 <div class="modal-overlay" id="cellModal" style="display:none">
   <div class="modal">
     <h3 id="cellModalTitle">授業を編集</h3>
@@ -342,7 +344,7 @@ function renderCalendar() {
     html += `<div class="legend-item"><div class="legend-dot ${presetColor(i)}"></div><span>${state.presets[i].name}</span></div>`;
   }
   html += '</div>';
-  html += `<div class="calendar-nav"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button><button class="btn btn-primary" onclick="printMonthly()" style="margin-left:12px;font-size:13px">今月の予定を出力</button></div>`;
+  html += `<div class="calendar-nav"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button><button class="btn btn-primary" onclick="printMonthly()" style="margin-left:12px;font-size:13px">今月の予定を出力</button><button class="btn btn-secondary" onclick="syncToCalendar()" style="margin-left:6px;font-size:13px">Googleカレンダーに追加</button></div>`;
   html += '<div class="calendar-grid">';
   ['日','月','火','水','木','金','土'].forEach((d,i) => {
     html += `<div class="cal-header ${i===0?'sun':i===6?'sat':''}">${d}</div>`;
@@ -430,6 +432,44 @@ function setDayPreset(dateStr, presetId) {
 }
 function calPrev() { if(calMonth===1){calMonth=12;calYear--;}else calMonth--; renderCalendar(); }
 function calNext() { if(calMonth===12){calMonth=1;calYear++;}else calMonth++; renderCalendar(); }
+
+function showToast(msg, duration) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(function() { el.style.display = 'none'; }, duration || 3000);
+}
+
+function syncToCalendar() {
+  // Count days with preset
+  const firstDay = new Date(calYear, calMonth-1, 1);
+  const lastDay = new Date(calYear, calMonth, 0);
+  let days = 0;
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const date = new Date(calYear, calMonth-1, d);
+    const dateStr = formatDate(date);
+    const config = state.calendarConfig[dateStr];
+    if (config && config.presetId) days++;
+  }
+  if (days === 0) { showToast('カレンダーに日程が設定されていません'); return; }
+
+  if (!confirm(calYear + '年' + calMonth + '月の予定（' + days + '日分）をGoogleカレンダーに追加します。\nよろしいですか？')) return;
+
+  showToast('追加中...', 30000);
+  const payload = JSON.stringify({ year: calYear, month: calMonth, state: state });
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        showToast(calMonth + '月の予定を' + result.count + '件追加しました');
+      } else {
+        showToast('エラー：' + result.error);
+      }
+    })
+    .withFailureHandler(function(err) {
+      showToast('エラーが発生しました：' + (err.message || err));
+    })
+    .createCalendarEvents(payload);
+}
 
 function printMonthly() {
   const DOW_NAMES = ['日','月','火','水','木','金','土'];
