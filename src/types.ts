@@ -23,6 +23,7 @@ export interface TimePreset {
   id: string
   name: string
   slots: Record<Period, TimeSlot>
+  visiblePeriods?: Period[]
 }
 
 export interface CalendarDayConfig {

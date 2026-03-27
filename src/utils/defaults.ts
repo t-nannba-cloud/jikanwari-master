@@ -21,6 +21,7 @@ function createDefaultPresets(): TimePreset[] {
     {
       id: 'normal',
       name: '通常日程',
+      visiblePeriods: ['1', '2', '3', '4'],
       slots: {
         // 学活17:30-17:35、休憩17:35-17:40
         '1': { label: '1時限', start: '17:40', end: '18:20' },
@@ -36,6 +37,7 @@ function createDefaultPresets(): TimePreset[] {
     {
       id: '35min',
       name: '35分日程',
+      visiblePeriods: ['1', '2', '3', '4', '放課後'],
       slots: {
         // 学活17:30-17:35、休憩17:35-17:40
         '1': { label: '1時限', start: '17:40', end: '18:15' },
@@ -51,6 +53,7 @@ function createDefaultPresets(): TimePreset[] {
     {
       id: '30min',
       name: '30分授業',
+      visiblePeriods: ['1', '2', '3', '4', '放課後'],
       slots: {
         // 学活17:30-17:35、休憩17:35-17:40
         '1': { label: '1時限', start: '17:40', end: '18:10' },
@@ -66,6 +69,7 @@ function createDefaultPresets(): TimePreset[] {
     {
       id: 'exam',
       name: 'テスト日程',
+      visiblePeriods: ['1', '2', '3', '4'],
       slots: {
         // 学活17:30-17:35、休憩17:35-17:40
         '1': { label: '1時限', start: '17:40', end: '18:10' },
@@ -81,6 +85,7 @@ function createDefaultPresets(): TimePreset[] {
     {
       id: 'ceremony',
       name: '始業式・終業式・修了式',
+      visiblePeriods: ['1', '放課後'],
       slots: {
         // 学活17:30-17:35、休憩17:35-17:40
         '1': { label: '式', start: '17:40', end: '18:10' },
