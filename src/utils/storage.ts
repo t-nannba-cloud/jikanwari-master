@@ -1,7 +1,7 @@
 import type { AppData } from '../types'
 import { createDefaultData } from './defaults'
 
-const STORAGE_KEY = 'jikanwari-data'
+const STORAGE_KEY = 'jikanwari-data-v2'
 
 export function loadData(): AppData {
   try {
