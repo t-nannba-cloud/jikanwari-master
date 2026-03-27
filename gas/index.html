@@ -217,12 +217,19 @@ function createEmptyTimetable() {
 const DEFAULT_SUBJECTS = ['国語','算数','数学','理科','社会','英語','音楽','体育','図工','美術','家庭','技術','道徳','総合','学活','自習'];
 
 function createDefaultData() {
-  return { timetable: createEmptyTimetable(), classTimetable: createEmptyTimetable(), presets: DEFAULT_PRESETS, calendarConfig: {}, activePresetId: 'normal', subjects: DEFAULT_SUBJECTS.slice() };
+  return {
+    timetable: createEmptyTimetable(),
+    classes: [
+      { name: 'クラス1', timetable: createEmptyTimetable() },
+      { name: 'クラス2', timetable: createEmptyTimetable() }
+    ],
+    presets: DEFAULT_PRESETS, calendarConfig: {}, activePresetId: 'normal', subjects: DEFAULT_SUBJECTS.slice()
+  };
 }
 
 let state = createDefaultData();
 let currentTab = 'timetable';
-let activeTimetableView = 'class'; // 'self' or 'class'
+let activeTimetableView = 'class0'; // 'self' | 'class0' | 'class1'
 let newSubjectInput = '';
 let editingCell = null;
 let calYear = new Date().getFullYear();
@@ -237,7 +244,15 @@ function init() {
           state = Object.assign(createDefaultData(), loaded);
           if (!state.presets || !state.presets.length) state.presets = DEFAULT_PRESETS;
           if (!state.subjects || !state.subjects.length) state.subjects = DEFAULT_SUBJECTS.slice();
-          if (!state.classTimetable) state.classTimetable = createEmptyTimetable();
+          // migrate old classTimetable → classes[0]
+          if (!state.classes) {
+            state.classes = [
+              { name: 'クラス1', timetable: state.classTimetable || createEmptyTimetable() },
+              { name: 'クラス2', timetable: createEmptyTimetable() }
+            ];
+            delete state.classTimetable;
+          }
+          if (state.classes.length < 2) state.classes.push({ name: 'クラス2', timetable: createEmptyTimetable() });
         } catch(e) { state = createDefaultData(); }
       }
       render();
@@ -282,12 +297,14 @@ function render() {
 function renderTimetable() {
   const preset = getActivePreset();
   const periods = preset ? (preset.visiblePeriods || ALL_PERIODS) : ALL_PERIODS;
-  const tt = activeTimetableView === 'self' ? state.timetable : state.classTimetable;
-  const label = activeTimetableView === 'self' ? '自分の時間割' : 'クラスの時間割';
-  let html = `<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
-    <span style="font-size:13px;color:#666">表示：</span>
-    <button class="btn ${activeTimetableView==='class'?'btn-primary':'btn-secondary'}" onclick="switchTimetableView('class')">クラスの時間割</button>
+  const tt = getActiveTimetable();
+  const c0name = state.classes[0].name;
+  const c1name = state.classes[1].name;
+  let html = `<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+    <button class="btn ${activeTimetableView==='class0'?'btn-primary':'btn-secondary'}" onclick="switchTimetableView('class0')">${c0name}</button>
+    <button class="btn ${activeTimetableView==='class1'?'btn-primary':'btn-secondary'}" onclick="switchTimetableView('class1')">${c1name}</button>
     <button class="btn ${activeTimetableView==='self'?'btn-primary':'btn-secondary'}" onclick="switchTimetableView('self')">自分の時間割</button>
+    ${activeTimetableView!=='self' ? `<input type="text" value="${activeTimetableView==='class0'?c0name:c1name}" onchange="renameClass(this.value)" style="padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:110px" placeholder="クラス名を変更">` : ''}
   </div>`;
   html += '<div class="timetable-wrap"><table class="timetable"><thead><tr><th class="period-cell">時限</th>';
   for (const day of DAYS) html += `<th>${day}</th>`;
@@ -318,6 +335,12 @@ function renderTimetable() {
 
 function switchTimetableView(view) {
   activeTimetableView = view;
+  renderTimetable();
+}
+function renameClass(name) {
+  const idx = activeTimetableView === 'class0' ? 0 : 1;
+  state.classes[idx].name = name.trim() || state.classes[idx].name;
+  saveState();
   renderTimetable();
 }
 
@@ -358,7 +381,9 @@ function renderCalendar() {
     html += `<div class="legend-item"><div class="legend-dot ${presetColor(i)}"></div><span>${state.presets[i].name}</span></div>`;
   }
   html += '</div>';
-  html += `<div class="calendar-nav"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button><button class="btn btn-primary" onclick="printMonthly()" style="margin-left:12px;font-size:13px">今月の予定を出力</button><button class="btn btn-secondary" onclick="syncToCalendar()" style="margin-left:6px;font-size:13px">Googleカレンダーに追加</button></div>`;
+  const c0name = state.classes[0].name;
+  const c1name = state.classes[1].name;
+  html += `<div class="calendar-nav" style="flex-wrap:wrap;gap:6px"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button><button class="btn btn-primary" onclick="printMonthly(0)" style="font-size:12px">${c0name}を出力</button><button class="btn btn-primary" onclick="printMonthly(1)" style="font-size:12px">${c1name}を出力</button><button class="btn btn-secondary" onclick="syncToCalendar()" style="font-size:12px">自分のカレンダーに追加</button></div>`;
   html += '<div class="calendar-grid">';
   ['日','月','火','水','木','金','土'].forEach((d,i) => {
     html += `<div class="cal-header ${i===0?'sun':i===6?'sat':''}">${d}</div>`;
@@ -410,7 +435,9 @@ function syncSubjectPicker() {
   });
 }
 function getActiveTimetable() {
-  return activeTimetableView === 'self' ? state.timetable : state.classTimetable;
+  if (activeTimetableView === 'self') return state.timetable;
+  if (activeTimetableView === 'class1') return state.classes[1].timetable;
+  return state.classes[0].timetable;
 }
 function openCellModal(day, period) {
   editingCell = {day, period};
@@ -421,7 +448,7 @@ function openCellModal(day, period) {
   document.getElementById('inputRoom').value = cell ? cell.room : '';
   const preset = getActivePreset();
   const slot = preset && preset.slots ? preset.slots[period] : null;
-  const viewLabel = activeTimetableView === 'self' ? '自分' : 'クラス';
+  const viewLabel = activeTimetableView === 'self' ? '自分' : activeTimetableView === 'class1' ? state.classes[1].name : state.classes[0].name;
   document.getElementById('cellModalTitle').textContent = `[${viewLabel}] ${day}曜 ${slot ? slot.label : period+'時限'}`;
   renderSubjectPicker();
   document.getElementById('cellModal').style.display = 'flex';
@@ -477,7 +504,7 @@ function syncToCalendar() {
   if (!confirm(calYear + '年' + calMonth + '月の予定（' + days + '日分）をGoogleカレンダーに追加します。\nよろしいですか？')) return;
 
   showToast('追加中...', 30000);
-  const payload = JSON.stringify({ year: calYear, month: calMonth, state: { timetable: state.classTimetable, presets: state.presets, calendarConfig: state.calendarConfig } });
+  const payload = JSON.stringify({ year: calYear, month: calMonth, state: { timetable: state.timetable, presets: state.presets, calendarConfig: state.calendarConfig } });
   google.script.run
     .withSuccessHandler(function(result) {
       if (result.success) {
@@ -492,42 +519,34 @@ function syncToCalendar() {
     .createCalendarEvents(payload);
 }
 
-function printMonthly() {
+function printMonthly(classIdx) {
   const DOW_NAMES = ['日','月','火','水','木','金','土'];
-  const firstDay = new Date(calYear, calMonth-1, 1);
   const lastDay = new Date(calYear, calMonth, 0);
-  // Collect all days with a preset
+  const classTT = state.classes[classIdx].timetable;
+  const className = state.classes[classIdx].name;
+  const ALL_PRINT_PERIODS = ['1','2','3','4','5','放課後'];
   const rows = [];
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const date = new Date(calYear, calMonth-1, d);
     const dow = date.getDay();
-    if (dow === 0) continue; // skip Sunday
+    if (dow === 0) continue;
     const dateStr = formatDate(date);
     const config = state.calendarConfig[dateStr];
     const presetId = config && config.presetId;
     const preset = presetId ? state.presets.find(p => p.id === presetId) : null;
-    rows.push({ d, dow, dateStr, preset });
+    rows.push({ d, dow, preset });
   }
-
-  // Determine which periods to show (union of all visible periods used)
-  const ALL_PRINT_PERIODS = ['1','2','3','4','5','放課後'];
-
   let tableRows = '';
   for (const row of rows) {
     const { d, dow, preset } = row;
     const dayName = DOW_NAMES[dow];
     const dayKey = ['','月','火','水','木','金','土'][dow];
     const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PRINT_PERIODS) : null;
-    let rowHtml = `<tr>
-      <td style="white-space:nowrap">${calMonth}/${d}（${dayName}）</td>
-      <td>${preset ? preset.name : '−'}</td>`;
+    let rowHtml = `<tr><td style="white-space:nowrap">${calMonth}/${d}（${dayName}）</td><td>${preset ? preset.name : '−'}</td>`;
     for (const period of ALL_PRINT_PERIODS) {
-      if (!preset || !visiblePeriods.includes(period)) {
-        rowHtml += `<td style="color:#ccc">−</td>`;
-        continue;
-      }
+      if (!preset || !visiblePeriods.includes(period)) { rowHtml += `<td style="color:#ccc">−</td>`; continue; }
       const slot = preset.slots[period];
-      const cell = state.classTimetable[dayKey] && state.classTimetable[dayKey][period];
+      const cell = classTT[dayKey] && classTT[dayKey][period];
       const subject = cell ? cell.subject : '';
       const room = cell ? cell.room : '';
       const timeStr = slot && slot.start !== slot.end ? `<div style="font-size:10px;color:#888">${slot.start}〜${slot.end}</div>` : '';
@@ -536,31 +555,14 @@ function printMonthly() {
     rowHtml += '</tr>';
     tableRows += rowHtml;
   }
-
   const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
-<title>${calYear}年${calMonth}月 時間割</title>
-<style>
-body { font-family: -apple-system, sans-serif; font-size: 12px; margin: 16px; }
-h2 { margin-bottom: 12px; font-size: 16px; }
-table { border-collapse: collapse; width: 100%; }
-th, td { border: 1px solid #ccc; padding: 5px 7px; vertical-align: top; text-align: center; }
-th { background: #4361ee; color: white; }
-tr:nth-child(even) td { background: #f8f9ff; }
-.sat th, .sat td { color: #2255cc; }
-@media print { button { display:none; } }
-</style>
+<title>${calYear}年${calMonth}月 ${className} 時間割</title>
+<style>body{font-family:-apple-system,sans-serif;font-size:12px;margin:16px}h2{margin-bottom:12px;font-size:16px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:5px 7px;vertical-align:top;text-align:center}th{background:#4361ee;color:white}tr:nth-child(even) td{background:#f8f9ff}@media print{button{display:none}}</style>
 </head><body>
-<h2>${calYear}年${calMonth}月 時間割</h2>
+<h2>${calYear}年${calMonth}月 ${className} 時間割</h2>
 <button onclick="window.print()" style="margin-bottom:12px;padding:6px 16px;background:#4361ee;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">印刷する</button>
-<table>
-<thead><tr>
-  <th>日付</th><th>日程</th>
-  <th>1時限</th><th>2時限</th><th>3時限</th><th>4時限</th><th>5時限</th><th>放課後</th>
-</tr></thead>
-<tbody>${tableRows}</tbody>
-</table>
-</body></html>`;
-
+<table><thead><tr><th>日付</th><th>日程</th><th>1時限</th><th>2時限</th><th>3時限</th><th>4時限</th><th>5時限</th><th>放課後</th></tr></thead>
+<tbody>${tableRows}</tbody></table></body></html>`;
   const w = window.open('', '_blank');
   w.document.write(html);
   w.document.close();
