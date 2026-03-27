@@ -155,6 +155,31 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 const DAYS = ['月','火','水','木','金','土'];
 const ALL_PERIODS = ['1','2','3','4','5','6','放課後'];
 
+// 日本の祝日（2024〜2027）
+const HOLIDAYS = new Set([
+  // 2024
+  '2024-01-01','2024-01-08','2024-02-11','2024-02-12','2024-02-23',
+  '2024-03-20','2024-04-29','2024-05-03','2024-05-04','2024-05-05','2024-05-06',
+  '2024-07-15','2024-08-11','2024-08-12','2024-09-16','2024-09-22','2024-09-23',
+  '2024-10-14','2024-11-03','2024-11-04','2024-11-23',
+  // 2025
+  '2025-01-01','2025-01-13','2025-02-11','2025-02-23','2025-02-24',
+  '2025-03-20','2025-04-29','2025-05-03','2025-05-04','2025-05-05','2025-05-06',
+  '2025-07-21','2025-08-11','2025-09-15','2025-09-23',
+  '2025-10-13','2025-11-03','2025-11-23','2025-11-24',
+  // 2026
+  '2026-01-01','2026-01-12','2026-02-11','2026-02-23',
+  '2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06',
+  '2026-07-20','2026-08-11','2026-09-21','2026-09-23',
+  '2026-10-12','2026-11-03','2026-11-23',
+  // 2027
+  '2027-01-01','2027-01-11','2027-02-11','2027-02-23',
+  '2027-03-21','2027-04-29','2027-05-03','2027-05-04','2027-05-05',
+  '2027-07-19','2027-08-11','2027-09-20','2027-09-23',
+  '2027-10-11','2027-11-03','2027-11-23',
+]);
+function isHoliday(dateStr) { return HOLIDAYS.has(dateStr); }
+
 const DEFAULT_PRESETS = [
   {
     id:'normal', name:'通常日程', visiblePeriods:['1','2','3','4'],
@@ -396,7 +421,7 @@ function renderCalendar() {
   html += '</div>';
   const c0name = state.classes[0].name;
   const c1name = state.classes[1].name;
-  html += `<div class="calendar-nav" style="flex-wrap:wrap;gap:6px"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button><button class="btn btn-primary" onclick="printMonthly(0)" style="font-size:12px">${c0name}を出力</button><button class="btn btn-primary" onclick="printMonthly(1)" style="font-size:12px">${c1name}を出力</button><button class="btn btn-secondary" onclick="syncToCalendar()" style="font-size:12px">自分のカレンダーに追加</button></div>`;
+  html += `<div class="calendar-nav" style="flex-wrap:wrap;gap:6px"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button><button class="btn btn-secondary" onclick="setAllNormal()" style="font-size:12px">通常日程を一括設定</button><button class="btn btn-danger" onclick="clearAllDays()" style="font-size:12px">全解除</button><button class="btn btn-primary" onclick="printMonthly(0)" style="font-size:12px">${c0name}を出力</button><button class="btn btn-primary" onclick="printMonthly(1)" style="font-size:12px">${c1name}を出力</button><button class="btn btn-secondary" onclick="syncToCalendar()" style="font-size:12px">自分のカレンダーに追加</button></div>`;
   html += '<div class="calendar-grid">';
   ['日','月','火','水','木','金','土'].forEach((d,i) => {
     html += `<div class="cal-header ${i===0?'sun':i===6?'sat':''}">${d}</div>`;
@@ -605,6 +630,32 @@ function clearPeriodMap() {
 }
 function calPrev() { if(calMonth===1){calMonth=12;calYear--;}else calMonth--; renderCalendar(); }
 function calNext() { if(calMonth===12){calMonth=1;calYear++;}else calMonth++; renderCalendar(); }
+
+function setAllNormal() {
+  const normalPreset = state.presets.find(p => p.id === 'normal') || state.presets[0];
+  if (!normalPreset) return;
+  const lastDay = new Date(calYear, calMonth, 0).getDate();
+  for (let d = 1; d <= lastDay; d++) {
+    const date = new Date(calYear, calMonth - 1, d);
+    const dow = date.getDay();
+    if (dow === 0 || dow === 6) continue; // 日・土 を除く
+    const dateStr = formatDate(date);
+    if (isHoliday(dateStr)) continue; // 祝日を除く
+    if (!state.calendarConfig[dateStr]) state.calendarConfig[dateStr] = {};
+    state.calendarConfig[dateStr].presetId = normalPreset.id;
+  }
+  saveState(); renderCalendar();
+}
+
+function clearAllDays() {
+  if (!confirm(calYear + '年' + calMonth + '月の全ての日程設定を解除しますか？')) return;
+  const lastDay = new Date(calYear, calMonth, 0).getDate();
+  for (let d = 1; d <= lastDay; d++) {
+    const dateStr = formatDate(new Date(calYear, calMonth - 1, d));
+    delete state.calendarConfig[dateStr];
+  }
+  saveState(); renderCalendar();
+}
 
 function showToast(msg, duration) {
   const el = document.getElementById('toast');
