@@ -670,51 +670,179 @@ function syncToCalendar() {
 
 function printMonthly(classIdx) {
   const DOW_NAMES = ['日','月','火','水','木','金','土'];
-  const lastDay = new Date(calYear, calMonth, 0);
+  const DOW_NAMES_SHORT = ['日','月','火','水','木','金','土'];
+  const lastDayNum = new Date(calYear, calMonth, 0).getDate();
   const classTT = state.classes[classIdx].timetable;
   const className = state.classes[classIdx].name;
   const ALL_PRINT_PERIODS = ['1','2','3','4','5'];
-  const rows = [];
-  for (let d = 1; d <= lastDay.getDate(); d++) {
-    const date = new Date(calYear, calMonth-1, d);
+
+  // 祝日名マップ（同じHOLIDAYSセットを参照して名前を付ける用）
+  const HOLIDAY_NAMES = {
+    '01-01':'元日','01-13':'成人の日','01-12':'成人の日','01-11':'成人の日',
+    '02-11':'建国記念の日','02-12':'振替休日','02-23':'天皇誕生日','02-24':'振替休日',
+    '03-20':'春分の日','03-21':'春分の日',
+    '04-29':'昭和の日','04-30':'振替休日',
+    '05-03':'憲法記念日','05-04':'みどりの日','05-05':'こどもの日','05-06':'振替休日',
+    '07-15':'海の日','07-21':'海の日','07-20':'海の日','07-19':'海の日',
+    '08-11':'山の日','08-12':'振替休日',
+    '09-15':'敬老の日','09-16':'敬老の日','09-21':'敬老の日','09-20':'敬老の日',
+    '09-22':'秋分の日','09-23':'秋分の日',
+    '10-13':'スポーツの日','10-14':'スポーツの日','10-12':'スポーツの日','10-11':'スポーツの日',
+    '11-03':'文化の日','11-04':'振替休日','11-23':'勤労感謝の日','11-24':'振替休日',
+  };
+
+  // 教科→色マップ
+  const SUBJECT_COLORS = {
+    '国語':  '#e8d5f5', '作文': '#d5f0d5', '書写': '#e0d5f5',
+    '算数':  '#d5e8ff', '数学': '#d5e8ff',
+    '理科':  '#d5f5e8', '社会': '#fff0cc',
+    '英語':  '#ffd5d5',
+    '音楽':  '#ffe8d5', '図工': '#ffd5e8', '美術': '#ffd5e8',
+    '体育':  '#d5f0d5', '家庭': '#ffecd5', '技術': '#e0f0d5',
+    '道徳':  '#f5f5d5', '総合': '#e5f5ff', '学活': '#f0e5ff',
+    '自習':  '#f0f0f0',
+  };
+  function subjectColor(s) {
+    if (!s) return null;
+    if (SUBJECT_COLORS[s]) return SUBJECT_COLORS[s];
+    // 部分一致フォールバック
+    for (const k of Object.keys(SUBJECT_COLORS)) {
+      if (s.includes(k)) return SUBJECT_COLORS[k];
+    }
+    return '#e8f4ff';
+  }
+
+  // 全日分のデータを構築
+  const allDays = [];
+  for (let d = 1; d <= lastDayNum; d++) {
+    const date = new Date(calYear, calMonth - 1, d);
     const dow = date.getDay();
-    if (dow === 0) continue;
     const dateStr = formatDate(date);
+    const mmdd = dateStr.slice(5); // MM-DD
     const config = state.calendarConfig[dateStr];
     const presetId = config && config.presetId;
     const preset = presetId ? state.presets.find(p => p.id === presetId) : null;
-    const periodMap = config && config.periodMap ? config.periodMap : {};
-    rows.push({ d, dow, preset, periodMap });
+    const periodMap = (config && config.periodMap) || {};
+    const holiday = isHoliday(dateStr);
+    const holidayName = holiday ? (HOLIDAY_NAMES[mmdd] || '祝日') : null;
+    allDays.push({ d, dow, dateStr, preset, periodMap, holiday, holidayName });
   }
-  let tableRows = '';
-  for (const row of rows) {
-    const { d, dow, preset, periodMap } = row;
-    const dayName = DOW_NAMES[dow];
+
+  // 1行のHTML生成
+  function buildRow(dayObj) {
+    const { d, dow, preset, periodMap, holiday, holidayName } = dayObj;
     const dayKey = ['','月','火','水','木','金','土'][dow];
-    const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PRINT_PERIODS) : null;
-    const mapNote = periodMap && Object.keys(periodMap).length > 0 ? '⚡' : '';
-    let rowHtml = `<tr><td style="white-space:nowrap">${calMonth}/${d}（${dayName}）${mapNote}</td><td>${preset ? preset.name : '−'}</td>`;
-    for (const period of ALL_PRINT_PERIODS) {
-      if (!preset || !visiblePeriods.includes(period)) { rowHtml += `<td style="color:#ccc">−</td>`; continue; }
-      const mapVal = periodMap && periodMap[period];
-      const cell = (mapVal && typeof mapVal === 'object')
-        ? mapVal
-        : (classTT[dayKey] && classTT[dayKey][mapVal || period]);
-      const subject = cell ? cell.subject : '';
-      const room = cell ? cell.room : '';
-      rowHtml += `<td>${subject ? `<strong>${subject}</strong>` : ''}<br>${room}</td>`;
+    const isSun = dow === 0;
+    const isSat = dow === 6;
+    const isOff = isSun || isSat || holiday;
+    const dateColor = isSun || holiday ? '#cc0000' : isSat ? '#2255cc' : '#222';
+    const rowBg = isOff ? '#f0f0f0' : 'white';
+    const textAlpha = isOff ? '0.45' : '1';
+    const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PRINT_PERIODS) : [];
+    const mapNote = Object.keys(periodMap).length > 0 ? '⚡' : '';
+
+    let row = `<tr class="day-row ${isOff?'off-day':''}" style="background:${rowBg}">`;
+    row += `<td class="date-cell" style="color:${dateColor}">${d}<span class="dow-label">${DOW_NAMES_SHORT[dow]}</span>${mapNote}</td>`;
+
+    if (isOff && holidayName) {
+      row += `<td colspan="5" class="holiday-cell">${holidayName}</td>`;
+    } else if (!preset && !isOff) {
+      row += `<td colspan="5" class="no-preset-cell">−</td>`;
+    } else if (isOff) {
+      row += `<td colspan="5" class="off-cell"></td>`;
+    } else {
+      for (const period of ALL_PRINT_PERIODS) {
+        if (!visiblePeriods.includes(period)) {
+          row += `<td class="subject-cell empty-cell"><span class="empty-mark">—</span></td>`;
+          continue;
+        }
+        const mapVal = periodMap[period];
+        const cell = (mapVal && typeof mapVal === 'object')
+          ? mapVal
+          : (classTT[dayKey] && classTT[dayKey][mapVal || period]);
+        const subject = cell ? cell.subject : '';
+        const room = cell ? cell.room : '';
+        const bg = subject ? subjectColor(subject) : null;
+        const bgStyle = bg ? `background:${bg};` : '';
+        const subjectHtml = subject
+          ? `<span class="subj">${subject}</span>${room ? `<span class="room">${room}</span>` : ''}`
+          : `<span class="empty-mark">—</span>`;
+        row += `<td class="subject-cell" style="${bgStyle}">${subjectHtml}</td>`;
+      }
     }
-    rowHtml += '</tr>';
-    tableRows += rowHtml;
+    row += '</tr>';
+    return row;
   }
+
+  // 週の区切り行
+  const weekGap = `<tr class="week-gap"><td colspan="6"></td></tr>`;
+
+  // 左（1〜16日）・右（17〜末日）カラムのHTML生成
+  function buildColumn(days) {
+    let html = '<table class="tt-table"><thead><tr>';
+    html += '<th class="th-date">日</th>';
+    for (const p of ALL_PRINT_PERIODS) html += `<th class="th-period">${p}</th>`;
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < days.length; i++) {
+      const day = days[i];
+      // 週の区切り：前の日が日曜で今日が月曜（かつ最初の行でない）
+      if (i > 0 && day.dow === 1) html += weekGap;
+      html += buildRow(day);
+    }
+    html += '</tbody></table>';
+    return html;
+  }
+
+  const leftDays  = allDays.filter(d => d.d <= 16);
+  const rightDays = allDays.filter(d => d.d >= 17);
+
+  const leftHtml  = buildColumn(leftDays);
+  const rightHtml = buildColumn(rightDays);
+
   const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>${calYear}年${calMonth}月 ${className} 時間割</title>
-<style>body{font-family:-apple-system,sans-serif;font-size:12px;margin:16px}h2{margin-bottom:12px;font-size:16px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:5px 7px;vertical-align:top;text-align:center}th{background:#4361ee;color:white}tr:nth-child(even) td{background:#f8f9ff}@media print{button{display:none}}</style>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; margin: 0; padding: 12px 16px; background: white; }
+h1.print-title { text-align: center; font-size: 14pt; font-weight: 700; margin: 0 0 10px; }
+.print-btn { display: block; margin: 0 auto 12px; padding: 6px 20px; background: #4361ee; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tt-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tt-table thead tr { background: #4361ee; color: white; }
+.th-date { width: 36px; font-size: 8pt; padding: 3px 2px; text-align: center; }
+.th-period { font-size: 8pt; padding: 3px 2px; text-align: center; }
+.day-row td { border: 1px solid #ddd; vertical-align: middle; height: 22px; }
+.date-cell { text-align: center; font-size: 9pt; font-weight: 600; padding: 2px 1px; white-space: nowrap; }
+.dow-label { font-size: 7.5pt; margin-left: 2px; }
+.subject-cell { text-align: center; padding: 1px 2px; font-size: 8.5pt; }
+.subj { display: block; font-weight: 600; font-size: 8.5pt; line-height: 1.2; }
+.room { display: block; font-size: 6.5pt; color: #555; line-height: 1.1; }
+.empty-mark { color: #bbb; font-size: 8pt; }
+.off-day td { color: rgba(0,0,0,0.35) !important; }
+.holiday-cell { text-align: center; font-size: 7.5pt; color: #cc0000 !important; padding: 2px; }
+.no-preset-cell { text-align: center; color: #bbb; font-size: 8pt; }
+.off-cell { }
+.week-gap { height: 6px; }
+.week-gap td { border: none; background: transparent; padding: 0; }
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  body { padding: 0; }
+  .print-btn { display: none; }
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  .tt-table thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .subject-cell { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
 </head><body>
-<h2>${calYear}年${calMonth}月 ${className} 時間割</h2>
-<button onclick="window.print()" style="margin-bottom:12px;padding:6px 16px;background:#4361ee;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">印刷する</button>
-<table><thead><tr><th>日付</th><th>日程</th><th>1時間目</th><th>2時間目</th><th>3時間目</th><th>4時間目</th><th>5時間目</th></tr></thead>
-<tbody>${tableRows}</tbody></table></body></html>`;
+<button class="print-btn" onclick="window.print()">印刷する</button>
+<h1 class="print-title">${calYear}年${calMonth}月　${className}　時間割</h1>
+<div class="two-col">
+  <div>${leftHtml}</div>
+  <div>${rightHtml}</div>
+</div>
+</body></html>`;
+
   const w = window.open('', '_blank');
   w.document.write(html);
   w.document.close();
