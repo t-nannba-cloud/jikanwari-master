@@ -117,7 +117,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <div class="modal-overlay" id="periodMapModal" style="display:none">
   <div class="modal" style="max-width:420px">
     <h3 id="periodMapTitle">時間割変更</h3>
-    <p style="font-size:12px;color:#888;margin-bottom:12px">各枠に表示する時限の内容を選んでください</p>
+    <p style="font-size:12px;color:#888;margin-bottom:12px">各枠に表示する時間目の内容を選んでください</p>
     <div id="periodMapBody"></div>
     <div class="modal-buttons">
       <button class="btn btn-secondary" onclick="closePeriodMapModal()">キャンセル</button>
@@ -182,50 +182,50 @@ function isHoliday(dateStr) { return HOLIDAYS.has(dateStr); }
 
 const DEFAULT_PRESETS = [
   {
-    id:'normal', name:'通常日程', visiblePeriods:['1','2','3','4'],
+    id:'normal', name:'通常授業', visiblePeriods:['1','2','3','4'],
     slots:{
-      '1':{label:'1時限',start:'17:40',end:'18:20'},
-      '2':{label:'2時限',start:'18:50',end:'19:30'},
-      '3':{label:'3時限',start:'19:35',end:'20:15'},
-      '4':{label:'4時限',start:'20:20',end:'21:00'},
-      '5':{label:'5時限',start:'21:05',end:'21:45'},
-      '6':{label:'6時限',start:'21:50',end:'22:30'},
+      '1':{label:'1時間目',start:'17:40',end:'18:20'},
+      '2':{label:'2時間目',start:'18:50',end:'19:30'},
+      '3':{label:'3時間目',start:'19:35',end:'20:15'},
+      '4':{label:'4時間目',start:'20:20',end:'21:00'},
+      '5':{label:'5時間目',start:'21:05',end:'21:45'},
+      '6':{label:'6時間目',start:'21:50',end:'22:30'},
       '放課後':{label:'放課後',start:'22:35',end:'23:25'},
     }
   },
   {
     id:'35min', name:'35分日程', visiblePeriods:['1','2','3','4','5'],
     slots:{
-      '1':{label:'1時限',start:'17:40',end:'18:15'},
-      '2':{label:'2時限',start:'18:45',end:'19:20'},
-      '3':{label:'3時限',start:'19:25',end:'20:00'},
-      '4':{label:'4時限',start:'20:05',end:'20:40'},
-      '5':{label:'5時限',start:'20:40',end:'21:00'},
-      '6':{label:'6時限',start:'20:40',end:'20:40'},
+      '1':{label:'1時間目',start:'17:40',end:'18:15'},
+      '2':{label:'2時間目',start:'18:45',end:'19:20'},
+      '3':{label:'3時間目',start:'19:25',end:'20:00'},
+      '4':{label:'4時間目',start:'20:05',end:'20:40'},
+      '5':{label:'5時間目',start:'20:40',end:'21:00'},
+      '6':{label:'6時間目',start:'20:40',end:'20:40'},
       '放課後':{label:'放課後',start:'20:40',end:'20:40'},
     }
   },
   {
     id:'30min', name:'30分授業', visiblePeriods:['1','2','3','4','5'],
     slots:{
-      '1':{label:'1時限',start:'17:40',end:'18:10'},
-      '2':{label:'2時限',start:'18:40',end:'19:10'},
-      '3':{label:'3時限',start:'19:15',end:'19:45'},
-      '4':{label:'4時限',start:'19:50',end:'20:20'},
-      '5':{label:'5時限',start:'20:20',end:'21:00'},
-      '6':{label:'6時限',start:'20:20',end:'20:20'},
+      '1':{label:'1時間目',start:'17:40',end:'18:10'},
+      '2':{label:'2時間目',start:'18:40',end:'19:10'},
+      '3':{label:'3時間目',start:'19:15',end:'19:45'},
+      '4':{label:'4時間目',start:'19:50',end:'20:20'},
+      '5':{label:'5時間目',start:'20:20',end:'21:00'},
+      '6':{label:'6時間目',start:'20:20',end:'20:20'},
       '放課後':{label:'放課後',start:'20:20',end:'20:20'},
     }
   },
   {
     id:'exam', name:'テスト日程', visiblePeriods:['1','2','3','4'],
     slots:{
-      '1':{label:'1時限',start:'17:40',end:'18:10'},
-      '2':{label:'2時限',start:'18:40',end:'19:20'},
-      '3':{label:'3時限',start:'19:30',end:'20:10'},
-      '4':{label:'4時限',start:'20:20',end:'21:00'},
-      '5':{label:'5時限',start:'21:00',end:'21:00'},
-      '6':{label:'6時限',start:'21:00',end:'21:00'},
+      '1':{label:'1時間目',start:'17:40',end:'18:10'},
+      '2':{label:'2時間目',start:'18:40',end:'19:20'},
+      '3':{label:'3時間目',start:'19:30',end:'20:10'},
+      '4':{label:'4時間目',start:'20:20',end:'21:00'},
+      '5':{label:'5時間目',start:'21:00',end:'21:00'},
+      '6':{label:'6時間目',start:'21:00',end:'21:00'},
       '放課後':{label:'放課後',start:'21:00',end:'21:00'},
     }
   },
@@ -233,11 +233,11 @@ const DEFAULT_PRESETS = [
     id:'ceremony', name:'始業式・終業式・修了式', visiblePeriods:['1','放課後'],
     slots:{
       '1':{label:'式',start:'17:40',end:'18:10'},
-      '2':{label:'2時限',start:'18:10',end:'18:10'},
-      '3':{label:'3時限',start:'18:10',end:'18:10'},
-      '4':{label:'4時限',start:'18:10',end:'18:10'},
-      '5':{label:'5時限',start:'18:10',end:'18:10'},
-      '6':{label:'6時限',start:'18:10',end:'18:10'},
+      '2':{label:'2時間目',start:'18:10',end:'18:10'},
+      '3':{label:'3時間目',start:'18:10',end:'18:10'},
+      '4':{label:'4時間目',start:'18:10',end:'18:10'},
+      '5':{label:'5時間目',start:'18:10',end:'18:10'},
+      '6':{label:'6時間目',start:'18:10',end:'18:10'},
       '放課後':{label:'解散',start:'19:00',end:'19:00'},
     }
   },
@@ -344,13 +344,13 @@ function renderTimetable() {
     <button class="btn ${activeTimetableView==='self'?'btn-primary':'btn-secondary'}" onclick="switchTimetableView('self')">自分の時間割</button>
     ${activeTimetableView!=='self' ? `<input type="text" value="${activeTimetableView==='class0'?c0name:c1name}" onchange="renameClass(this.value)" style="padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:110px" placeholder="クラス名を変更">` : ''}
   </div>`;
-  html += '<div class="timetable-wrap"><table class="timetable"><thead><tr><th class="period-cell">時限</th>';
+  html += '<div class="timetable-wrap"><table class="timetable"><thead><tr><th class="period-cell">時間目</th>';
   for (const day of DAYS) html += `<th>${day}</th>`;
   html += '</tr></thead><tbody>';
   for (const period of periods) {
     const slot = preset && preset.slots ? preset.slots[period] : null;
     html += '<tr><td class="period-cell">';
-    html += `<div class="period-label">${slot ? slot.label : (period === '放課後' ? '放課後' : period+'時限')}</div>`;
+    html += `<div class="period-label">${slot ? slot.label : (period === '放課後' ? '放課後' : period+'時間目')}</div>`;
     if (slot && slot.start && slot.start !== slot.end) html += `<div class="period-time">${slot.start}〜${slot.end}</div>`;
     html += '</td>';
     for (const day of DAYS) {
@@ -397,7 +397,7 @@ function renderPresets() {
   for (const p of state.presets) {
     html += `<div class="preset-card"><div class="preset-card-header"><span class="preset-card-name">${p.name}</span>`;
     html += `<button class="btn btn-secondary" onclick="toggleEdit('${p.id}')">編集</button></div>`;
-    html += `<div id="edit-${p.id}" style="display:none"><table class="preset-table"><thead><tr><th>時限</th><th>開始</th><th>終了</th></tr></thead><tbody>`;
+    html += `<div id="edit-${p.id}" style="display:none"><table class="preset-table"><thead><tr><th>時間目</th><th>開始</th><th>終了</th></tr></thead><tbody>`;
     for (const period of displayPeriods) {
       const slot = p.slots[period];
       html += `<tr><td>${slot.label}</td>`;
@@ -421,7 +421,7 @@ function renderCalendar() {
   html += '</div>';
   const c0name = state.classes[0].name;
   const c1name = state.classes[1].name;
-  html += `<div class="calendar-nav" style="flex-wrap:wrap;gap:6px"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button><button class="btn btn-secondary" onclick="setAllNormal()" style="font-size:12px">通常日程を一括設定</button><button class="btn btn-danger" onclick="clearAllDays()" style="font-size:12px">全解除</button><button class="btn btn-primary" onclick="printMonthly(0)" style="font-size:12px">${c0name}を出力</button><button class="btn btn-primary" onclick="printMonthly(1)" style="font-size:12px">${c1name}を出力</button><button class="btn btn-secondary" onclick="syncToCalendar()" style="font-size:12px">自分のカレンダーに追加</button></div>`;
+  html += `<div class="calendar-nav" style="flex-wrap:wrap;gap:6px"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button><button class="btn btn-secondary" onclick="setAllNormal()" style="font-size:12px">通常授業を一括設定</button><button class="btn btn-danger" onclick="clearAllDays()" style="font-size:12px">全解除</button><button class="btn btn-primary" onclick="printMonthly(0)" style="font-size:12px">${c0name}を出力</button><button class="btn btn-primary" onclick="printMonthly(1)" style="font-size:12px">${c1name}を出力</button><button class="btn btn-secondary" onclick="syncToCalendar()" style="font-size:12px">自分のカレンダーに追加</button></div>`;
   html += '<div class="calendar-grid">';
   ['日','月','火','水','木','金','土'].forEach((d,i) => {
     html += `<div class="cal-header ${i===0?'sun':i===6?'sat':''}">${d}</div>`;
@@ -491,7 +491,7 @@ function openCellModal(day, period) {
   const preset = getActivePreset();
   const slot = preset && preset.slots ? preset.slots[period] : null;
   const viewLabel = activeTimetableView === 'self' ? '自分' : activeTimetableView === 'class1' ? state.classes[1].name : state.classes[0].name;
-  document.getElementById('cellModalTitle').textContent = `[${viewLabel}] ${day}曜 ${slot ? slot.label : period+'時限'}`;
+  document.getElementById('cellModalTitle').textContent = `[${viewLabel}] ${day}曜 ${slot ? slot.label : period+'時間目'}`;
   renderSubjectPicker();
   document.getElementById('cellModal').style.display = 'flex';
 }
@@ -713,7 +713,7 @@ function printMonthly(classIdx) {
 </head><body>
 <h2>${calYear}年${calMonth}月 ${className} 時間割</h2>
 <button onclick="window.print()" style="margin-bottom:12px;padding:6px 16px;background:#4361ee;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">印刷する</button>
-<table><thead><tr><th>日付</th><th>日程</th><th>1時限</th><th>2時限</th><th>3時限</th><th>4時限</th><th>5時限</th></tr></thead>
+<table><thead><tr><th>日付</th><th>日程</th><th>1時間目</th><th>2時間目</th><th>3時間目</th><th>4時間目</th><th>5時間目</th></tr></thead>
 <tbody>${tableRows}</tbody></table></body></html>`;
   const w = window.open('', '_blank');
   w.document.write(html);
