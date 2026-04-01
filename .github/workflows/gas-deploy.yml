@@ -16,3 +16,4 @@ jobs:
       - name: Write clasp credentials
         run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
       - run: clasp push --force
+      - run: clasp deploy --deploymentId AKfycbwBvFSkLXErPSd36D9KMAGISJeH7ZMiC868EoUuoSGykzx3_FqxVzmDPgGeQDSBwubp --description "auto deploy"
