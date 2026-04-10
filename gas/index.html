@@ -734,9 +734,9 @@ function printMonthly(classIdx) {
     const dayKey = ['','月','火','水','木','金','土'][dow];
     const isSun = dow === 0;
     const isSat = dow === 6;
-    const isOff = isSun || isSat || holiday;
-    const dateColor = isSun || holiday ? '#cc0000' : isSat ? '#2255cc' : '#222';
-    const rowBg = isOff ? '#f0f0f0' : 'white';
+    const isOff = isSun || (isSat && !preset) || (holiday && !preset);
+    const dateColor = isSun || (holiday && !preset) ? '#cc0000' : isSat ? '#2255cc' : holiday ? '#cc0000' : '#222';
+    const rowBg = isOff ? '#f0f0f0' : (isSat || holiday) && preset ? '#fffbe6' : 'white';
     const textAlpha = isOff ? '0.45' : '1';
     const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PRINT_PERIODS) : [];
     const mapNote = Object.keys(periodMap).length > 0 ? '⚡' : '';
