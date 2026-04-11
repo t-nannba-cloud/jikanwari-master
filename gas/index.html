@@ -699,7 +699,184 @@ function renderPrintTab() {
     </div>
   </div>`;
 
+  // 週案
+  html += `<div class="subject-manager" style="margin-top:12px">
+    <h3>週案（自分）</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:12px">授業カレンダーから読み取ってA4横の週案形式で出力します</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:13px">週の開始日（月曜日）：</label>
+      <input type="date" id="weekPlanStart" style="padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+      <button class="btn btn-primary" onclick="loadWeekPlan()">週案を生成</button>
+    </div>
+    <div id="weekPlanStatus" style="margin-top:8px;font-size:13px;color:#888"></div>
+  </div>`;
+
+  // 今週の月曜日をデフォルトにセット
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
   document.getElementById('tab-print').innerHTML = html;
+  const startEl = document.getElementById('weekPlanStart');
+  if (startEl) startEl.value = formatDate(monday);
+}
+
+function loadWeekPlan() {
+  const startEl = document.getElementById('weekPlanStart');
+  if (!startEl || !startEl.value) { showToast('週の開始日を選んでください'); return; }
+  const statusEl = document.getElementById('weekPlanStatus');
+  statusEl.textContent = '読み込み中...';
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (!result.success) { statusEl.textContent = 'エラー：' + result.error; return; }
+      statusEl.textContent = result.events.length + '件のイベントを取得しました';
+      printWeekPlan(startEl.value, result.events);
+    })
+    .withFailureHandler(function(err) { statusEl.textContent = 'エラー：' + (err.message || err); })
+    .getWeekEvents(startEl.value);
+}
+
+function printWeekPlan(startDateStr, events) {
+  const DOW_JP = ['日','月','火','水','木','金','土'];
+  const startDate = new Date(startDateStr + 'T00:00:00');
+  // 月〜土の6日分
+  const days = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    days.push(d);
+  }
+
+  // イベントを日付×時刻でグループ化
+  const byDate = {};
+  for (const ev of events) {
+    if (!byDate[ev.dateStr]) byDate[ev.dateStr] = [];
+    byDate[ev.dateStr].push(ev);
+  }
+  // 各日を時刻順にソート
+  for (const k of Object.keys(byDate)) {
+    byDate[k].sort((a, b) => a.startStr.localeCompare(b.startStr));
+  }
+
+  // 最大時限数を決定（最大5）
+  const maxPeriod = Math.min(5, Math.max(1, ...days.map(d => {
+    const ds = formatDate(d); return (byDate[ds] || []).length;
+  })));
+  const PERIOD_LABELS = ['1時間目','2時間目','3時間目','4時間目','5時間目'];
+
+  // 教科別集計
+  const subjectCount = {};
+  for (const ev of events) {
+    const subj = ev.title.replace(/（[^）]*）/, '').trim();
+    subjectCount[subj] = (subjectCount[subj] || 0) + 1;
+  }
+
+  // 使用する日（日曜でかつイベントなし → 省略しない：全日表示）
+  // ただし土曜にイベントがなければ省略
+  const activeDays = days.filter((d, i) => i < 5 || (byDate[formatDate(d)] && byDate[formatDate(d)].length > 0));
+
+  // 週の日付範囲
+  const weekLabel = (() => {
+    const s = activeDays[0], e = activeDays[activeDays.length - 1];
+    return `${s.getMonth()+1}月${s.getDate()}日（${DOW_JP[s.getDay()]}）〜${e.getMonth()+1}月${e.getDate()}日（${DOW_JP[e.getDay()]}）`;
+  })();
+
+  // ヘッダー行
+  let headCols = `<th class="lbl-cell">時限</th>`;
+  for (const d of activeDays) {
+    const ds = formatDate(d);
+    const isHol = isHoliday(ds);
+    const dow = d.getDay();
+    const color = dow === 0 || isHol ? '#cc0000' : dow === 6 ? '#2255cc' : '#333';
+    headCols += `<th class="day-cell" style="color:${color}">${d.getMonth()+1}/${d.getDate()}<br><span style="font-size:9pt">${DOW_JP[dow]}</span></th>`;
+  }
+  headCols += `<th class="sum-cell">教科<br>集計</th>`;
+
+  // 時限行
+  let periodRows = '';
+  for (let pi = 0; pi < maxPeriod; pi++) {
+    // 予定行
+    let yoteiRow = `<tr class="yotei-row"><td class="lbl-cell"><div class="period-lbl">${PERIOD_LABELS[pi]}</div><div class="row-type">予定</div></td>`;
+    for (const d of activeDays) {
+      const ds = formatDate(d);
+      const ev = byDate[ds] && byDate[ds][pi];
+      const subj = ev ? ev.title.replace(/（[^）]*）/, '').trim() : '';
+      const loc  = ev ? (ev.location || '') : '';
+      const time = ev ? `${ev.startStr}〜${ev.endStr}` : '';
+      yoteiRow += `<td class="subject-td">${ev ? `<div class="subj-name">${subj}</div><div class="subj-time">${time}</div><div class="subj-loc">${loc}</div>` : '<span class="empty-dash">—</span>'}</td>`;
+    }
+    // 集計列：最初の時限行にだけ教科一覧をrowspan
+    if (pi === 0) {
+      const sumRows = maxPeriod * 2; // 予定+実施
+      let sumHtml = '';
+      for (const [subj, cnt] of Object.entries(subjectCount)) {
+        sumHtml += `<div class="sum-row"><span class="sum-subj">${subj}</span><span class="sum-cnt">${cnt}</span></div>`;
+      }
+      yoteiRow += `<td class="sum-td" rowspan="${sumRows}">${sumHtml}</td>`;
+    }
+    yoteiRow += '</tr>';
+
+    // 実施行（空白）
+    let jissiRow = `<tr class="jissi-row"><td class="lbl-cell"><div class="row-type">実施</div></td>`;
+    for (let di = 0; di < activeDays.length; di++) {
+      jissiRow += `<td class="jissi-td"></td>`;
+    }
+    jissiRow += '</tr>';
+
+    periodRows += yoteiRow + jissiRow;
+  }
+
+  // 備考行
+  let bikoRow = `<tr class="biko-row"><td class="lbl-cell" style="font-size:9pt;writing-mode:vertical-rl;text-align:center">備考・特記事項</td>`;
+  for (let di = 0; di < activeDays.length; di++) bikoRow += `<td class="biko-td"></td>`;
+  bikoRow += `<td class="biko-td"></td></tr>`;
+
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>週案 ${weekLabel}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Helvetica Neue',sans-serif;background:white;padding:10px}
+.print-btn{padding:6px 18px;background:#4361ee;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:10px}
+.plan-title{text-align:center;font-size:13pt;font-weight:700;margin-bottom:6px}
+.week-label{text-align:center;font-size:10pt;color:#555;margin-bottom:8px}
+table.wp{width:100%;border-collapse:collapse;table-layout:fixed}
+table.wp th,table.wp td{border:1px solid #aaa;vertical-align:top}
+.lbl-cell{width:58px;background:#f0f4ff;text-align:center;padding:3px 2px}
+.period-lbl{font-size:8.5pt;font-weight:700;color:#4361ee;line-height:1.3}
+.row-type{font-size:7.5pt;color:#888;margin-top:2px}
+.day-cell{text-align:center;padding:4px 2px;font-size:9.5pt;font-weight:700;background:#f8f9ff}
+.sum-cell{width:64px;text-align:center;font-size:8pt;background:#f8f9ff;padding:3px}
+.subject-td{padding:3px 4px;height:36px;vertical-align:middle}
+.subj-name{font-size:9.5pt;font-weight:700;line-height:1.3}
+.subj-time{font-size:7pt;color:#888;line-height:1.2}
+.subj-loc{font-size:7pt;color:#666;line-height:1.2}
+.empty-dash{color:#ccc;font-size:10pt}
+.jissi-row td{height:28px}
+.jissi-td{background:#fafafa}
+.biko-row td{height:48px;background:#fffbe6}
+.biko-td{border:1px solid #aaa}
+.sum-td{padding:4px;font-size:8pt;vertical-align:top}
+.sum-row{display:flex;justify-content:space-between;gap:4px;margin-bottom:2px;border-bottom:1px dotted #ddd;padding-bottom:1px}
+.sum-subj{font-size:7.5pt}
+.sum-cnt{font-size:8pt;font-weight:700;color:#4361ee;white-space:nowrap}
+@media print{
+  @page{size:A4 landscape;margin:8mm}
+  body{padding:0}
+  .print-btn{display:none}
+  -webkit-print-color-adjust:exact;print-color-adjust:exact
+}
+</style></head><body>
+<button class="print-btn" onclick="window.print()">印刷する</button>
+<div class="plan-title">週案</div>
+<div class="week-label">${weekLabel}</div>
+<table class="wp">
+<thead><tr>${headCols}</tr></thead>
+<tbody>${periodRows}${bikoRow}</tbody>
+</table>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
 }
 
 function printMonthlyFromTab(classIdx) {
