@@ -738,140 +738,246 @@ function loadWeekPlan() {
 function printWeekPlan(startDateStr, events) {
   const DOW_JP = ['日','月','火','水','木','金','土'];
   const startDate = new Date(startDateStr + 'T00:00:00');
-  // 月〜土の6日分
+
+  // 月〜日の7日分（月曜起点）
   const days = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date(startDate);
     d.setDate(startDate.getDate() + i);
     days.push(d);
   }
+  const monToWed = days.slice(0, 3);  // 月火水
+  const thuToSat = days.slice(3, 6);  // 木金土
+  const sunday   = days[6];           // 日
 
-  // イベントを日付×時刻でグループ化
+  // イベントを日付×時刻でグループ化・ソート
   const byDate = {};
   for (const ev of events) {
     if (!byDate[ev.dateStr]) byDate[ev.dateStr] = [];
     byDate[ev.dateStr].push(ev);
   }
-  // 各日を時刻順にソート
   for (const k of Object.keys(byDate)) {
     byDate[k].sort((a, b) => a.startStr.localeCompare(b.startStr));
   }
 
-  // 最大時限数を決定（最大5）
-  const maxPeriod = Math.min(5, Math.max(1, ...days.map(d => {
-    const ds = formatDate(d); return (byDate[ds] || []).length;
-  })));
-  const PERIOD_LABELS = ['1時間目','2時間目','3時間目','4時間目','5時間目'];
-
-  // 教科別集計
+  // 教科別集計（右ページ用）
   const subjectCount = {};
   for (const ev of events) {
     const subj = ev.title.replace(/（[^）]*）/, '').trim();
-    subjectCount[subj] = (subjectCount[subj] || 0) + 1;
+    if (subj) subjectCount[subj] = (subjectCount[subj] || 0) + 1;
   }
 
-  // 使用する日（日曜でかつイベントなし → 省略しない：全日表示）
-  // ただし土曜にイベントがなければ省略
-  const activeDays = days.filter((d, i) => i < 5 || (byDate[formatDate(d)] && byDate[formatDate(d)].length > 0));
+  const PERIOD_ROWS = [
+    { key: '1', label: '第1時' },
+    { key: '2', label: '第2時' },
+    { key: '3', label: '第3時' },
+    { key: '4', label: '第4時' },
+    { key: 'lunch', label: '昼休み', special: true },
+    { key: '5', label: '第5時' },
+    { key: '6', label: '第6時' },
+  ];
 
-  // 週の日付範囲
-  const weekLabel = (() => {
-    const s = activeDays[0], e = activeDays[activeDays.length - 1];
-    return `${s.getMonth()+1}月${s.getDate()}日（${DOW_JP[s.getDay()]}）〜${e.getMonth()+1}月${e.getDate()}日（${DOW_JP[e.getDay()]}）`;
-  })();
-
-  // ヘッダー行
-  let headCols = `<th class="lbl-cell">時限</th>`;
-  for (const d of activeDays) {
+  // 日付ヘッダーセルを生成
+  function dayHeaderCell(d) {
     const ds = formatDate(d);
-    const isHol = isHoliday(ds);
     const dow = d.getDay();
-    const color = dow === 0 || isHol ? '#cc0000' : dow === 6 ? '#2255cc' : '#333';
-    headCols += `<th class="day-cell" style="color:${color}">${d.getMonth()+1}/${d.getDate()}<br><span style="font-size:9pt">${DOW_JP[dow]}</span></th>`;
+    const isHol = isHoliday(ds);
+    const color = dow === 0 || isHol ? '#c00' : dow === 6 ? '#1a4cc0' : '#222';
+    return `<th class="day-hd" style="color:${color}">${DOW_JP[dow]}<br><span class="day-date">${d.getMonth()+1}/${d.getDate()}</span></th>`;
   }
-  headCols += `<th class="sum-cell">教科<br>集計</th>`;
 
-  // 時限行
-  let periodRows = '';
-  for (let pi = 0; pi < maxPeriod; pi++) {
-    // 予定行
-    let yoteiRow = `<tr class="yotei-row"><td class="lbl-cell"><div class="period-lbl">${PERIOD_LABELS[pi]}</div><div class="row-type">予定</div></td>`;
-    for (const d of activeDays) {
-      const ds = formatDate(d);
-      const ev = byDate[ds] && byDate[ds][pi];
-      const subj = ev ? ev.title.replace(/（[^）]*）/, '').trim() : '';
-      const loc  = ev ? (ev.location || '') : '';
-      const time = ev ? `${ev.startStr}〜${ev.endStr}` : '';
-      yoteiRow += `<td class="subject-td">${ev ? `<div class="subj-name">${subj}</div><div class="subj-time">${time}</div><div class="subj-loc">${loc}</div>` : '<span class="empty-dash">—</span>'}</td>`;
-    }
-    // 集計列：最初の時限行にだけ教科一覧をrowspan
-    if (pi === 0) {
-      const sumRows = maxPeriod * 2; // 予定+実施
-      let sumHtml = '';
-      for (const [subj, cnt] of Object.entries(subjectCount)) {
-        sumHtml += `<div class="sum-row"><span class="sum-subj">${subj}</span><span class="sum-cnt">${cnt}</span></div>`;
+  // 予定セルの内容
+  function periodCell(d, periodIndex) {
+    const ds = formatDate(d);
+    const ev = byDate[ds] && byDate[ds][periodIndex];
+    if (!ev) return `<td class="subj-td empty-td"></td>`;
+    const subj = ev.title.replace(/（[^）]*）/, '').trim();
+    const loc  = ev.location || '';
+    return `<td class="subj-td"><div class="subj-n">${subj}</div>${loc ? `<div class="subj-l">${loc}</div>` : ''}</td>`;
+  }
+
+  // ページを構築するヘルパー
+  function buildPage(pageDays, includeSum, includeSunday) {
+    // 行数計算: 出退×2 + 6時限×2 + 昼休み×1 + 備考×1 = 16
+    const regularPeriods = PERIOD_ROWS.filter(p => !p.special).length;
+    const specialPeriods = PERIOD_ROWS.filter(p => p.special).length;
+    const totalBodyRows = 2 + regularPeriods * 2 + specialPeriods + 1;
+
+    // 出退勤行（出）
+    let shutsuRow = `<tr class="shutsu-row">` +
+      `<td class="lbl-td" rowspan="2"><div class="lbl-vt">出退勤</div></td>` +
+      pageDays.map(() => `<td class="shutsu-td"><div class="shutsu-sub">出</div></td>`).join('') +
+      (includeSum
+        ? `<td class="sum-td-main" rowspan="${totalBodyRows}">` +
+          `<div class="sum-title">教科別<br>時数集計</div>` +
+          Object.entries(subjectCount).map(([s,c])=>`<div class="sum-entry"><span class="sum-s">${s}</span><span class="sum-c">${c}</span></div>`).join('') +
+          `</td>`
+        : '') +
+      `</tr>`;
+
+    // 出退勤行（退）
+    let taiRow = `<tr class="tai-row">` +
+      pageDays.map(() => `<td class="shutsu-td"><div class="shutsu-sub">退</div></td>`).join('') +
+      `</tr>`;
+
+    // 時限行（予定+実施）
+    let periodHtml = '';
+    let periodIndex = 0;
+    for (const pr of PERIOD_ROWS) {
+      if (pr.special) {
+        periodHtml += `<tr class="lunch-row">` +
+          `<td class="lbl-td" style="font-size:7pt;text-align:center">${pr.label}</td>` +
+          pageDays.map(() => `<td class="lunch-td"></td>`).join('') +
+          `</tr>`;
+        continue;
       }
-      yoteiRow += `<td class="sum-td" rowspan="${sumRows}">${sumHtml}</td>`;
+      // 予定行
+      periodHtml += `<tr class="yotei-row">` +
+        `<td class="lbl-td yotei-lbl"><div class="lbl-period">${pr.label}</div><div class="lbl-sub">予定</div></td>` +
+        pageDays.map(d => periodCell(d, periodIndex)).join('') +
+        `</tr>`;
+      // 実施行
+      periodHtml += `<tr class="jissi-row">` +
+        `<td class="lbl-td jissi-lbl"><div class="lbl-sub">実施</div></td>` +
+        pageDays.map(() => `<td class="jissi-td"></td>`).join('') +
+        `</tr>`;
+      periodIndex++;
     }
-    yoteiRow += '</tr>';
 
-    // 実施行（空白）
-    let jissiRow = `<tr class="jissi-row"><td class="lbl-cell"><div class="row-type">実施</div></td>`;
-    for (let di = 0; di < activeDays.length; di++) {
-      jissiRow += `<td class="jissi-td"></td>`;
+    // 備考行
+    let bikoHtml = `<tr class="biko-row">` +
+      `<td class="lbl-td biko-lbl"><div class="lbl-vt">備考</div></td>` +
+      pageDays.map(() => `<td class="biko-td"></td>`).join('') +
+      `</tr>`;
+
+    // 日曜行（右ページ下部）
+    let sunHtml = '';
+    if (includeSunday) {
+      const ds = formatDate(sunday);
+      const sunEvs = byDate[ds] || [];
+      const sunColspan = pageDays.length + (includeSum ? 1 : 0);
+      sunHtml = `<tr class="sun-row">` +
+        `<td class="lbl-td sun-lbl">日<br><span style="font-size:6pt">${sunday.getMonth()+1}/${sunday.getDate()}</span></td>` +
+        `<td colspan="${sunColspan}" style="padding:4px 6px;font-size:8pt;background:#fff8f8">` +
+        (sunEvs.length ? sunEvs.map(e => `<span class="sun-ev">${e.title.replace(/（[^）]*）/,'').trim()}</span>`).join('　') : '<span style="color:#aaa">特記なし</span>') +
+        `</td></tr>`;
     }
-    jissiRow += '</tr>';
 
-    periodRows += yoteiRow + jissiRow;
+    const dayHeaders = pageDays.map(d => dayHeaderCell(d)).join('');
+
+    // 承認印（右ページ右上）
+    const stampHtml = includeSum ? `
+      <div class="stamps">
+        <div class="stamp-box"><div class="stamp-lbl">校長</div></div>
+        <div class="stamp-box"><div class="stamp-lbl">教頭</div></div>
+        <div class="stamp-box"><div class="stamp-lbl">本人</div></div>
+      </div>` : '';
+
+    return `
+      ${stampHtml}
+      <table class="wp">
+        <thead>
+          <tr>
+            <th class="lbl-hd"></th>
+            ${dayHeaders}
+            ${includeSum ? `<th class="sum-hd-top">教科別<br>時数</th>` : ''}
+          </tr>
+        </thead>
+        <tbody>
+          ${shutsuRow}${taiRow}
+          ${periodHtml}
+          ${bikoHtml}
+          ${sunHtml}
+        </tbody>
+      </table>`;
   }
 
-  // 備考行
-  let bikoRow = `<tr class="biko-row"><td class="lbl-cell" style="font-size:9pt;writing-mode:vertical-rl;text-align:center">備考・特記事項</td>`;
-  for (let di = 0; di < activeDays.length; di++) bikoRow += `<td class="biko-td"></td>`;
-  bikoRow += `<td class="biko-td"></td></tr>`;
+  // 週のラベル
+  const s = days[0], e = days[5];
+  const weekLabel = `${s.getFullYear()}年　${s.getMonth()+1}月${s.getDate()}日（${DOW_JP[s.getDay()]}）〜${e.getMonth()+1}月${e.getDate()}日（${DOW_JP[e.getDay()]}）`;
+
+  const leftPage  = buildPage(monToWed, false, false);
+  const rightPage = buildPage(thuToSat, true,  true);
 
   const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
-<title>週案 ${weekLabel}</title>
+<title>週案</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,'Helvetica Neue',sans-serif;background:white;padding:10px}
-.print-btn{padding:6px 18px;background:#4361ee;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:10px}
-.plan-title{text-align:center;font-size:13pt;font-weight:700;margin-bottom:6px}
-.week-label{text-align:center;font-size:10pt;color:#555;margin-bottom:8px}
-table.wp{width:100%;border-collapse:collapse;table-layout:fixed}
-table.wp th,table.wp td{border:1px solid #aaa;vertical-align:top}
-.lbl-cell{width:58px;background:#f0f4ff;text-align:center;padding:3px 2px}
-.period-lbl{font-size:8.5pt;font-weight:700;color:#4361ee;line-height:1.3}
-.row-type{font-size:7.5pt;color:#888;margin-top:2px}
-.day-cell{text-align:center;padding:4px 2px;font-size:9.5pt;font-weight:700;background:#f8f9ff}
-.sum-cell{width:64px;text-align:center;font-size:8pt;background:#f8f9ff;padding:3px}
-.subject-td{padding:3px 4px;height:36px;vertical-align:middle}
-.subj-name{font-size:9.5pt;font-weight:700;line-height:1.3}
-.subj-time{font-size:7pt;color:#888;line-height:1.2}
-.subj-loc{font-size:7pt;color:#666;line-height:1.2}
-.empty-dash{color:#ccc;font-size:10pt}
-.jissi-row td{height:28px}
-.jissi-td{background:#fafafa}
-.biko-row td{height:48px;background:#fffbe6}
-.biko-td{border:1px solid #aaa}
-.sum-td{padding:4px;font-size:8pt;vertical-align:top}
-.sum-row{display:flex;justify-content:space-between;gap:4px;margin-bottom:2px;border-bottom:1px dotted #ddd;padding-bottom:1px}
-.sum-subj{font-size:7.5pt}
-.sum-cnt{font-size:8pt;font-weight:700;color:#4361ee;white-space:nowrap}
+body{font-family:-apple-system,'Hiragino Sans','Meiryo',sans-serif;background:#fff}
+.print-btn{padding:6px 18px;background:#4361ee;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin:8px}
+.page{width:182mm;min-height:257mm;padding:6mm;page-break-after:always;position:relative}
+.page:last-child{page-break-after:auto}
+.pg-header{text-align:center;margin-bottom:3mm}
+.pg-title{font-size:13pt;font-weight:700;letter-spacing:2px}
+.pg-week{font-size:8.5pt;color:#444;margin-top:1mm}
+table.wp{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8pt}
+table.wp th,table.wp td{border:1px solid #888;vertical-align:middle;padding:0}
+.lbl-hd{width:22px;background:#eef}
+.day-hd{text-align:center;font-size:8.5pt;font-weight:700;padding:2px 1px;background:#eef;line-height:1.3}
+.day-date{font-size:7pt;font-weight:400}
+.lbl-td{width:22px;background:#eef;text-align:center;padding:1px}
+.lbl-period{font-size:7.5pt;font-weight:700;line-height:1.2;color:#22c}
+.lbl-sub{font-size:6pt;color:#888;line-height:1}
+.lbl-vt{font-size:7pt;writing-mode:vertical-rl;text-orientation:mixed;line-height:1}
+.shutsu-row td,.tai-row td{height:14px}
+.shutsu-td{padding:0 2px}
+.shutsu-sub{font-size:6.5pt;color:#666;text-align:right;padding-right:2px}
+.yotei-lbl{height:26px}
+.jissi-lbl{height:16px;background:#f4f4f4}
+.yotei-row td{height:26px}
+.subj-td{padding:2px 3px;vertical-align:middle}
+.subj-n{font-size:8pt;font-weight:700;line-height:1.3}
+.subj-l{font-size:6.5pt;color:#555;line-height:1.1}
+.empty-td{background:#f9f9f9}
+.jissi-row td{height:16px;background:#fafafa}
+.jissi-td{border:1px solid #bbb}
+.lunch-row td{height:14px;background:#fffbe6}
+.lunch-td{border:1px solid #ccc}
+.biko-row td{height:28px;background:#fffdf0}
+.biko-lbl{writing-mode:vertical-rl;font-size:7pt}
+.biko-td{border:1px solid #bbb}
+.sum-hd-top{width:50px;text-align:center;font-size:7pt;background:#eef;padding:2px}
+.sum-td-main{width:50px;border:1px solid #888;background:#f8f9ff;vertical-align:top;padding:3px}
+.sum-title{font-weight:700;font-size:7pt;text-align:center;border-bottom:1px solid #aaa;padding-bottom:2px;margin-bottom:3px;line-height:1.3}
+.sum-entry{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dotted #ccc;padding:1px 0;gap:2px}
+.sum-s{font-size:6.5pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:28px}
+.sum-c{font-size:7.5pt;font-weight:700;color:#22c;white-space:nowrap}
+.stamps{display:flex;justify-content:flex-end;gap:2mm;margin-bottom:2mm}
+.stamp-box{width:14mm;height:14mm;border:1px solid #888;text-align:center;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:1mm}
+.stamp-lbl{font-size:6pt;color:#666}
+.sun-row td{border:1px solid #888}
+.sun-lbl{background:#eef;font-size:7.5pt;font-weight:700;color:#c00;text-align:center}
+.sun-ev{display:inline-block;margin-right:6px;font-weight:700}
+@media screen{
+  body{background:#ccc;padding:10mm}
+  .page{background:#fff;margin:0 auto 10mm;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+}
 @media print{
-  @page{size:A4 landscape;margin:8mm}
-  body{padding:0}
+  @page{size:B5 portrait;margin:0}
+  body{background:#fff;padding:0}
   .print-btn{display:none}
+  .page{width:182mm;padding:6mm}
   -webkit-print-color-adjust:exact;print-color-adjust:exact
 }
 </style></head><body>
-<button class="print-btn" onclick="window.print()">印刷する</button>
-<div class="plan-title">週案</div>
-<div class="week-label">${weekLabel}</div>
-<table class="wp">
-<thead><tr>${headCols}</tr></thead>
-<tbody>${periodRows}${bikoRow}</tbody>
-</table>
+<div style="text-align:center;margin:6px"><button class="print-btn" onclick="window.print()">印刷する（B5×2枚）</button></div>
+
+<div class="page">
+  <div class="pg-header">
+    <div class="pg-title">週　案</div>
+    <div class="pg-week">${weekLabel}</div>
+  </div>
+  ${leftPage}
+</div>
+
+<div class="page">
+  <div class="pg-header">
+    <div class="pg-title">週　案</div>
+    <div class="pg-week">${weekLabel}</div>
+  </div>
+  ${rightPage}
+</div>
+
 </body></html>`;
 
   const w = window.open('', '_blank');
