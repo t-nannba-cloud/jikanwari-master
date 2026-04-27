@@ -740,15 +740,14 @@ function printWeekPlan(startDateStr, events) {
   const startDate = new Date(startDateStr + 'T00:00:00');
 
   // 月〜日の7日分（月曜起点）
-  const days = [];
-  for (let i = 0; i < 7; i++) {
+  const days = Array.from({length: 7}, (_, i) => {
     const d = new Date(startDate);
     d.setDate(startDate.getDate() + i);
-    days.push(d);
-  }
-  const monToWed = days.slice(0, 3);  // 月火水
-  const thuToSat = days.slice(3, 6);  // 木金土
-  const sunday   = days[6];           // 日
+    return d;
+  });
+  const monToWed = days.slice(0, 3);
+  const thuToSat = days.slice(3, 6);
+  const sunday   = days[6];
 
   // イベントを日付×時刻でグループ化・ソート
   const byDate = {};
@@ -797,7 +796,7 @@ function printWeekPlan(startDateStr, events) {
   }
 
   // ページを構築するヘルパー
-  function buildPage(pageDays, includeSum, includeSunday) {
+  function buildPage(pageDays, includeSum) {
     // 行数計算: 出退×2 + 6時限×2 + 昼休み×1 + 備考×1 = 16
     const regularPeriods = PERIOD_ROWS.filter(p => !p.special).length;
     const specialPeriods = PERIOD_ROWS.filter(p => p.special).length;
@@ -850,31 +849,9 @@ function printWeekPlan(startDateStr, events) {
       pageDays.map(() => `<td class="biko-td"></td>`).join('') +
       `</tr>`;
 
-    // 日曜行（右ページ下部）
-    let sunHtml = '';
-    if (includeSunday) {
-      const ds = formatDate(sunday);
-      const sunEvs = byDate[ds] || [];
-      const sunColspan = pageDays.length + (includeSum ? 1 : 0);
-      sunHtml = `<tr class="sun-row">` +
-        `<td class="lbl-td sun-lbl">日<br><span style="font-size:6pt">${sunday.getMonth()+1}/${sunday.getDate()}</span></td>` +
-        `<td colspan="${sunColspan}" style="padding:4px 6px;font-size:8pt;background:#fff8f8">` +
-        (sunEvs.length ? sunEvs.map(e => `<span class="sun-ev">${e.title.replace(/（[^）]*）/,'').trim()}</span>`).join('　') : '<span style="color:#aaa">特記なし</span>') +
-        `</td></tr>`;
-    }
-
     const dayHeaders = pageDays.map(d => dayHeaderCell(d)).join('');
 
-    // 承認印（右ページ右上）
-    const stampHtml = includeSum ? `
-      <div class="stamps">
-        <div class="stamp-box"><div class="stamp-lbl">校長</div></div>
-        <div class="stamp-box"><div class="stamp-lbl">教頭</div></div>
-        <div class="stamp-box"><div class="stamp-lbl">本人</div></div>
-      </div>` : '';
-
     return `
-      ${stampHtml}
       <table class="wp">
         <thead>
           <tr>
@@ -887,7 +864,6 @@ function printWeekPlan(startDateStr, events) {
           ${shutsuRow}${taiRow}
           ${periodHtml}
           ${bikoHtml}
-          ${sunHtml}
         </tbody>
       </table>`;
   }
@@ -896,8 +872,16 @@ function printWeekPlan(startDateStr, events) {
   const s = days[0], e = days[5];
   const weekLabel = `${s.getFullYear()}年　${s.getMonth()+1}月${s.getDate()}日（${DOW_JP[s.getDay()]}）〜${e.getMonth()+1}月${e.getDate()}日（${DOW_JP[e.getDay()]}）`;
 
-  const leftPage  = buildPage(monToWed, false, false);
-  const rightPage = buildPage(thuToSat, true,  true);
+  const leftTable  = buildPage(monToWed, false);
+  const rightTable = buildPage(thuToSat, true);
+
+  // 日曜行（全幅）
+  const sunDs = formatDate(sunday);
+  const sunEvs = byDate[sunDs] || [];
+  const sunRow = `<div class="sun-bar">
+    <span class="sun-dow">日（${sunday.getMonth()+1}/${sunday.getDate()}）</span>
+    ${sunEvs.length ? sunEvs.map(e => `<span class="sun-ev">${e.title.replace(/（[^）]*）/,'').trim()}</span>`).join('　') : '<span style="color:#aaa">特記なし</span>'}
+  </div>`;
 
   const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>週案</title>
@@ -905,77 +889,82 @@ function printWeekPlan(startDateStr, events) {
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,'Hiragino Sans','Meiryo',sans-serif;background:#fff}
 .print-btn{padding:6px 18px;background:#4361ee;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin:8px}
-.page{width:182mm;min-height:257mm;padding:6mm;page-break-after:always;position:relative}
-.page:last-child{page-break-after:auto}
-.pg-header{text-align:center;margin-bottom:3mm}
-.pg-title{font-size:13pt;font-weight:700;letter-spacing:2px}
-.pg-week{font-size:8.5pt;color:#444;margin-top:1mm}
-table.wp{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8pt}
+.page{width:190mm;padding:8mm 8mm 6mm;position:relative}
+.pg-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:3mm}
+.pg-title{font-size:13pt;font-weight:700;letter-spacing:3px;text-align:center;flex:1}
+.pg-week{font-size:8pt;color:#444;text-align:center;margin-top:1mm}
+.stamps{display:flex;gap:2mm}
+.stamp-box{width:12mm;height:12mm;border:1px solid #888;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:1mm}
+.stamp-lbl{font-size:5.5pt;color:#666}
+.two-col{display:flex;gap:3mm;align-items:flex-start}
+.col{flex:1;min-width:0}
+table.wp{width:100%;border-collapse:collapse;table-layout:fixed;font-size:7.5pt}
 table.wp th,table.wp td{border:1px solid #888;vertical-align:middle;padding:0}
-.lbl-hd{width:22px;background:#eef}
-.day-hd{text-align:center;font-size:8.5pt;font-weight:700;padding:2px 1px;background:#eef;line-height:1.3}
-.day-date{font-size:7pt;font-weight:400}
-.lbl-td{width:22px;background:#eef;text-align:center;padding:1px}
-.lbl-period{font-size:7.5pt;font-weight:700;line-height:1.2;color:#22c}
-.lbl-sub{font-size:6pt;color:#888;line-height:1}
-.lbl-vt{font-size:7pt;writing-mode:vertical-rl;text-orientation:mixed;line-height:1}
-.shutsu-row td,.tai-row td{height:14px}
+.lbl-hd{width:20px;background:#eef}
+.day-hd{text-align:center;font-size:8pt;font-weight:700;padding:2px 1px;background:#eef;line-height:1.3}
+.day-date{font-size:6.5pt;font-weight:400}
+.lbl-td{width:20px;background:#eef;text-align:center;padding:1px}
+.lbl-period{font-size:7pt;font-weight:700;line-height:1.2;color:#22c}
+.lbl-sub{font-size:5.5pt;color:#888;line-height:1}
+.lbl-vt{font-size:6.5pt;writing-mode:vertical-rl;text-orientation:mixed;line-height:1}
+.shutsu-row td,.tai-row td{height:12px}
 .shutsu-td{padding:0 2px}
-.shutsu-sub{font-size:6.5pt;color:#666;text-align:right;padding-right:2px}
-.yotei-lbl{height:26px}
-.jissi-lbl{height:16px;background:#f4f4f4}
-.yotei-row td{height:26px}
+.shutsu-sub{font-size:6pt;color:#666;text-align:right;padding-right:2px}
+.yotei-lbl{height:24px}
+.jissi-lbl{height:14px;background:#f4f4f4}
+.yotei-row td{height:24px}
 .subj-td{padding:2px 3px;vertical-align:middle}
-.subj-n{font-size:8pt;font-weight:700;line-height:1.3}
-.subj-l{font-size:6.5pt;color:#555;line-height:1.1}
+.subj-n{font-size:7.5pt;font-weight:700;line-height:1.3}
+.subj-l{font-size:6pt;color:#555;line-height:1.1}
 .empty-td{background:#f9f9f9}
-.jissi-row td{height:16px;background:#fafafa}
+.jissi-row td{height:14px;background:#fafafa}
 .jissi-td{border:1px solid #bbb}
-.lunch-row td{height:14px;background:#fffbe6}
+.lunch-row td{height:12px;background:#fffbe6}
 .lunch-td{border:1px solid #ccc}
-.biko-row td{height:28px;background:#fffdf0}
-.biko-lbl{writing-mode:vertical-rl;font-size:7pt}
+.biko-row td{height:24px;background:#fffdf0}
+.biko-lbl{writing-mode:vertical-rl;font-size:6.5pt}
 .biko-td{border:1px solid #bbb}
-.sum-hd-top{width:50px;text-align:center;font-size:7pt;background:#eef;padding:2px}
-.sum-td-main{width:50px;border:1px solid #888;background:#f8f9ff;vertical-align:top;padding:3px}
-.sum-title{font-weight:700;font-size:7pt;text-align:center;border-bottom:1px solid #aaa;padding-bottom:2px;margin-bottom:3px;line-height:1.3}
-.sum-entry{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dotted #ccc;padding:1px 0;gap:2px}
-.sum-s{font-size:6.5pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:28px}
-.sum-c{font-size:7.5pt;font-weight:700;color:#22c;white-space:nowrap}
-.stamps{display:flex;justify-content:flex-end;gap:2mm;margin-bottom:2mm}
-.stamp-box{width:14mm;height:14mm;border:1px solid #888;text-align:center;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:1mm}
-.stamp-lbl{font-size:6pt;color:#666}
-.sun-row td{border:1px solid #888}
-.sun-lbl{background:#eef;font-size:7.5pt;font-weight:700;color:#c00;text-align:center}
+.sum-hd-top{width:44px;text-align:center;font-size:6.5pt;background:#eef;padding:2px}
+.sum-td-main{width:44px;border:1px solid #888;background:#f8f9ff;vertical-align:top;padding:2px}
+.sum-title{font-weight:700;font-size:6.5pt;text-align:center;border-bottom:1px solid #aaa;padding-bottom:2px;margin-bottom:2px;line-height:1.3}
+.sum-entry{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dotted #ccc;padding:1px 0;gap:1px}
+.sum-s{font-size:6pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:24px}
+.sum-c{font-size:7pt;font-weight:700;color:#22c;white-space:nowrap}
+.sun-bar{margin-top:3mm;border:1px solid #888;padding:4px 8px;background:#fff8f8;font-size:8pt}
+.sun-dow{font-weight:700;color:#c00;margin-right:8px}
 .sun-ev{display:inline-block;margin-right:6px;font-weight:700}
 @media screen{
   body{background:#ccc;padding:10mm}
-  .page{background:#fff;margin:0 auto 10mm;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .page{background:#fff;margin:0 auto;box-shadow:0 2px 8px rgba(0,0,0,.3)}
 }
 @media print{
-  @page{size:B5 portrait;margin:0}
+  @page{size:A4 portrait;margin:0}
   body{background:#fff;padding:0}
   .print-btn{display:none}
-  .page{width:182mm;padding:6mm}
+  .page{width:210mm;padding:8mm 8mm 6mm}
   -webkit-print-color-adjust:exact;print-color-adjust:exact
 }
 </style></head><body>
-<div style="text-align:center;margin:6px"><button class="print-btn" onclick="window.print()">印刷する（B5×2枚）</button></div>
+<div style="text-align:center;margin:6px"><button class="print-btn" onclick="window.print()">印刷する（A4縦）</button></div>
 
 <div class="page">
-  <div class="pg-header">
-    <div class="pg-title">週　案</div>
-    <div class="pg-week">${weekLabel}</div>
+  <div class="pg-top">
+    <div style="width:42mm"></div>
+    <div>
+      <div class="pg-title">週　案</div>
+      <div class="pg-week">${weekLabel}</div>
+    </div>
+    <div class="stamps">
+      <div class="stamp-box"><div class="stamp-lbl">校長</div></div>
+      <div class="stamp-box"><div class="stamp-lbl">教頭</div></div>
+      <div class="stamp-box"><div class="stamp-lbl">本人</div></div>
+    </div>
   </div>
-  ${leftPage}
-</div>
-
-<div class="page">
-  <div class="pg-header">
-    <div class="pg-title">週　案</div>
-    <div class="pg-week">${weekLabel}</div>
+  <div class="two-col">
+    <div class="col">${leftTable}</div>
+    <div class="col">${rightTable}</div>
   </div>
-  ${rightPage}
+  ${sunRow}
 </div>
 
 </body></html>`;
