@@ -91,6 +91,29 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .content { padding: 8px; }
   .header h1 { font-size: 16px; }
 }
+
+/* 週記録タブ */
+.wr-nav{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.wr-nav button:not(.btn){background:white;border:1px solid #ddd;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:15px}
+.wr-nav-title{font-size:16px;font-weight:600;min-width:160px;text-align:center}
+.wr-table{width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);font-size:13px}
+.wr-table th,.wr-table td{border:1px solid #e8e8e8;padding:0}
+.wr-table thead th{background:#4361ee;color:white;padding:8px 4px;text-align:center;font-size:13px}
+.wr-table thead th.sat{color:#b3d9ff}
+.wr-table thead th.hol{color:#ffb3ba}
+.wr-lbl-td{width:68px;background:#f8f9ff;padding:5px 4px;text-align:center;vertical-align:middle}
+.wr-period-name{font-size:11px;font-weight:700;color:#4361ee;line-height:1.2}
+.wr-field-lbl{font-size:9px;color:#aaa;margin-top:3px}
+.wr-day-td{padding:3px 5px;vertical-align:top}
+.wr-subj{font-size:10px;color:#888;margin-bottom:1px;font-weight:600}
+.wr-textarea{width:100%;min-height:44px;border:none;resize:vertical;font-size:12px;font-family:inherit;background:transparent;outline:none;padding:2px;line-height:1.5}
+.wr-textarea:focus{background:#f0f4ff;border-radius:3px}
+.wr-hw-row>td{background:#fffbe6}
+.wr-hw-textarea{width:100%;min-height:28px;border:none;resize:vertical;font-size:11px;font-family:inherit;background:transparent;outline:none;padding:2px;color:#7a6000;line-height:1.4}
+.wr-hw-textarea:focus{background:#fff8d6;border-radius:3px}
+.wr-note-row>td{background:#f0fff4}
+.wr-note-textarea{width:100%;min-height:32px;border:none;resize:vertical;font-size:12px;font-family:inherit;background:transparent;outline:none;padding:2px;color:#1a6035;line-height:1.4}
+.wr-note-textarea:focus{background:#e0ffe8;border-radius:3px}
 </style>
 </head>
 <body>
@@ -104,6 +127,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <div class="tab active" onclick="switchTab('timetable')">時間割</div>
   <div class="tab" onclick="switchTab('presets')">プリセット</div>
   <div class="tab" onclick="switchTab('calendar')">カレンダー</div>
+  <div class="tab" onclick="switchTab('record')">週記録</div>
   <div class="tab" onclick="switchTab('print')">印刷</div>
 </div>
 
@@ -111,6 +135,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <div id="tab-timetable"></div>
   <div id="tab-presets" style="display:none"></div>
   <div id="tab-calendar" style="display:none"></div>
+  <div id="tab-record" style="display:none"></div>
   <div id="tab-print" style="display:none"></div>
 </div>
 
@@ -263,13 +288,15 @@ function createDefaultData() {
       { name: 'クラス1', timetable: createEmptyTimetable() },
       { name: 'クラス2', timetable: createEmptyTimetable() }
     ],
-    presets: DEFAULT_PRESETS, calendarConfig: {}, activePresetId: 'normal', subjects: DEFAULT_SUBJECTS.slice()
+    presets: DEFAULT_PRESETS, calendarConfig: {}, activePresetId: 'normal',
+    subjects: DEFAULT_SUBJECTS.slice(), weeklyContent: {}
   };
 }
 
 let state = createDefaultData();
 let currentTab = 'timetable';
 let activeTimetableView = 'class0'; // 'self' | 'class0' | 'class1'
+let weekRecordMonday = getMondayOfWeek(new Date());
 let newSubjectInput = '';
 let editingCell = null;
 let calYear = new Date().getFullYear();
@@ -293,6 +320,7 @@ function init() {
             delete state.classTimetable;
           }
           if (state.classes.length < 2) state.classes.push({ name: 'クラス2', timetable: createEmptyTimetable() });
+          if (!state.weeklyContent) state.weeklyContent = {};
         } catch(e) { state = createDefaultData(); }
       }
       render();
@@ -315,9 +343,21 @@ function formatDate(date) {
   return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
 }
 
+function getMondayOfWeek(date) {
+  const d = new Date(date);
+  const dow = d.getDay();
+  d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function switchTab(tab) {
   currentTab = tab;
-  const TAB_NAMES = ['timetable','presets','calendar','print'];
+  const TAB_NAMES = ['timetable','presets','calendar','record','print'];
   document.querySelectorAll('.tab').forEach((el, i) => {
     el.classList.toggle('active', TAB_NAMES[i] === tab);
   });
@@ -333,6 +373,7 @@ function render() {
   if (currentTab === 'timetable') renderTimetable();
   else if (currentTab === 'presets') renderPresets();
   else if (currentTab === 'calendar') renderCalendar();
+  else if (currentTab === 'record') renderWeekRecord();
   else if (currentTab === 'print') renderPrintTab();
 }
 
@@ -671,6 +712,107 @@ function syncToCalendar() {
     })
     .createCalendarEvents(payload);
 }
+
+// ───── 週記録タブ ─────
+
+function renderWeekRecord() {
+  const DOW_JP = ['日','月','火','水','木','金','土'];
+  const PERIODS = ['1','2','3','4','5','6'];
+
+  const weekDays = Array.from({length: 6}, (_, i) => {
+    const d = new Date(weekRecordMonday);
+    d.setDate(weekRecordMonday.getDate() + i);
+    return d;
+  });
+
+  const s = weekDays[0], e = weekDays[5];
+  const title = `${s.getFullYear()}年　${s.getMonth()+1}月${s.getDate()}日〜${e.getMonth()+1}月${e.getDate()}日`;
+
+  let html = `<div class="wr-nav">
+    <button onclick="moveWeekRecord(-1)">◀</button>
+    <span class="wr-nav-title">${title}</span>
+    <button onclick="moveWeekRecord(1)">▶</button>
+    <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;margin-left:4px" onclick="goToThisWeek()">今週</button>
+  </div>`;
+
+  html += '<div class="timetable-wrap"><table class="wr-table"><thead><tr>';
+  html += '<th class="wr-lbl-td">時限</th>';
+  for (const d of weekDays) {
+    const ds = formatDate(d);
+    const dow = d.getDay();
+    const isHol = isHoliday(ds);
+    const cls = isHol ? 'hol' : dow === 6 ? 'sat' : '';
+    html += `<th class="${cls}">${DOW_JP[dow]}<br><span style="font-size:11px;font-weight:400">${d.getMonth()+1}/${d.getDate()}</span></th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const period of PERIODS) {
+    // 授業内容行
+    html += `<tr class="wr-content-row"><td class="wr-lbl-td" rowspan="2">`;
+    html += `<div class="wr-period-name">${period}時間目</div>`;
+    html += `<div class="wr-field-lbl" style="margin-top:3px">授業内容</div></td>`;
+    for (const d of weekDays) {
+      const ds = formatDate(d);
+      const dow = d.getDay();
+      const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
+      const cell = dayKey ? (state.timetable[dayKey] && state.timetable[dayKey][period]) : null;
+      const subj = cell && cell.subject ? cell.subject : '';
+      const content = state.weeklyContent[ds] && state.weeklyContent[ds][period]
+        ? (state.weeklyContent[ds][period].content || '') : '';
+      html += `<td class="wr-day-td">`;
+      if (subj) html += `<div class="wr-subj">${escHtml(subj)}</div>`;
+      html += `<textarea class="wr-textarea" placeholder="授業内容をメモ…" oninput="saveWeekContent('${ds}','${period}','content',this.value)">${escHtml(content)}</textarea>`;
+      html += `</td>`;
+    }
+    html += `</tr>`;
+
+    // 宿題行
+    html += `<tr class="wr-hw-row"><td class="wr-lbl-td" style="background:#fffbe6"><div class="wr-field-lbl" style="color:#a07000">宿題・課題</div></td>`;
+    for (const d of weekDays) {
+      const ds = formatDate(d);
+      const homework = state.weeklyContent[ds] && state.weeklyContent[ds][period]
+        ? (state.weeklyContent[ds][period].homework || '') : '';
+      html += `<td class="wr-day-td"><textarea class="wr-hw-textarea" placeholder="宿題・課題…" oninput="saveWeekContent('${ds}','${period}','homework',this.value)">${escHtml(homework)}</textarea></td>`;
+    }
+    html += `</tr>`;
+  }
+
+  // 出欠・特記事項行
+  html += `<tr class="wr-note-row"><td class="wr-lbl-td" style="background:#f0fff4"><div class="wr-period-name" style="color:#1a6035">出欠</div><div class="wr-field-lbl">特記事項</div></td>`;
+  for (const d of weekDays) {
+    const ds = formatDate(d);
+    const note = state.weeklyContent[ds] ? (state.weeklyContent[ds].note || '') : '';
+    html += `<td class="wr-day-td"><textarea class="wr-note-textarea" placeholder="出欠・特記事項…" oninput="saveWeekContent('${ds}','note','note',this.value)">${escHtml(note)}</textarea></td>`;
+  }
+  html += `</tr>`;
+
+  html += '</tbody></table></div>';
+  document.getElementById('tab-record').innerHTML = html;
+}
+
+function saveWeekContent(dateStr, period, field, value) {
+  if (!state.weeklyContent[dateStr]) state.weeklyContent[dateStr] = {};
+  if (period === 'note') {
+    state.weeklyContent[dateStr].note = value;
+  } else {
+    if (!state.weeklyContent[dateStr][period]) state.weeklyContent[dateStr][period] = {};
+    state.weeklyContent[dateStr][period][field] = value;
+  }
+  saveState();
+}
+
+function moveWeekRecord(dir) {
+  weekRecordMonday = new Date(weekRecordMonday);
+  weekRecordMonday.setDate(weekRecordMonday.getDate() + dir * 7);
+  renderWeekRecord();
+}
+
+function goToThisWeek() {
+  weekRecordMonday = getMondayOfWeek(new Date());
+  renderWeekRecord();
+}
+
+// ─────────────────────────
 
 function renderPrintTab() {
   const c0name = state.classes[0].name;
