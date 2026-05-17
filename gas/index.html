@@ -733,6 +733,7 @@ function renderWeekRecord() {
     <span class="wr-nav-title">${title}</span>
     <button onclick="moveWeekRecord(1)">▶</button>
     <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;margin-left:4px" onclick="goToThisWeek()">今週</button>
+    <button class="btn btn-primary" style="font-size:12px;padding:5px 10px;margin-left:8px" onclick="printWeekRecord()">印刷</button>
   </div>`;
 
   html += '<div class="timetable-wrap"><table class="wr-table"><thead><tr>';
@@ -810,6 +811,103 @@ function moveWeekRecord(dir) {
 function goToThisWeek() {
   weekRecordMonday = getMondayOfWeek(new Date());
   renderWeekRecord();
+}
+
+function printWeekRecord() {
+  const DOW_JP = ['日','月','火','水','木','金','土'];
+  const PERIODS = ['1','2','3','4','5','6'];
+
+  const weekDays = Array.from({length: 6}, (_, i) => {
+    const d = new Date(weekRecordMonday);
+    d.setDate(weekRecordMonday.getDate() + i);
+    return d;
+  });
+  const s = weekDays[0], e = weekDays[5];
+  const weekLabel = `${s.getFullYear()}年　${s.getMonth()+1}月${s.getDate()}日（${DOW_JP[s.getDay()]}）〜${e.getMonth()+1}月${e.getDate()}日（${DOW_JP[e.getDay()]}）`;
+
+  // ヘッダー行
+  let headCols = '<th class="lbl-hd"></th>';
+  for (const d of weekDays) {
+    const ds = formatDate(d);
+    const dow = d.getDay();
+    const isHol = isHoliday(ds);
+    const color = dow === 6 ? '#1a4cc0' : isHol ? '#c00' : '#222';
+    headCols += `<th style="color:${color};text-align:center;font-size:8.5pt;padding:3px 2px;background:#eef">${DOW_JP[dow]}<br><span style="font-size:7pt;font-weight:400">${d.getMonth()+1}/${d.getDate()}</span></th>`;
+  }
+
+  // 時限行（授業内容＋宿題の2段）
+  let bodyRows = '';
+  for (const period of PERIODS) {
+    // 授業内容行
+    bodyRows += `<tr>`;
+    bodyRows += `<td class="lbl-td" rowspan="2"><div style="font-size:7pt;font-weight:700;color:#22c;line-height:1.2">${period}時間目</div><div style="font-size:6pt;color:#aaa;margin-top:3px">授業内容</div></td>`;
+    for (const d of weekDays) {
+      const ds = formatDate(d);
+      const dow = d.getDay();
+      const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
+      const cell = dayKey ? (state.timetable[dayKey] && state.timetable[dayKey][period]) : null;
+      const subj = cell && cell.subject ? cell.subject : '';
+      const content = (state.weeklyContent[ds] && state.weeklyContent[ds][period])
+        ? (state.weeklyContent[ds][period].content || '') : '';
+      bodyRows += `<td style="padding:3px 4px;vertical-align:top">`;
+      if (subj) bodyRows += `<div style="font-size:6.5pt;color:#888;margin-bottom:1px">${escHtml(subj)}</div>`;
+      bodyRows += `<div style="font-size:8pt;line-height:1.5;white-space:pre-wrap">${escHtml(content)}</div>`;
+      bodyRows += `</td>`;
+    }
+    bodyRows += `</tr>`;
+    // 宿題行
+    bodyRows += `<tr style="background:#fffbe6">`;
+    bodyRows += `<td style="font-size:6pt;color:#a07000;text-align:center;background:#fffbe6;padding:2px">宿題</td>`;
+    for (const d of weekDays) {
+      const ds = formatDate(d);
+      const hw = (state.weeklyContent[ds] && state.weeklyContent[ds][period])
+        ? (state.weeklyContent[ds][period].homework || '') : '';
+      bodyRows += `<td style="padding:2px 4px;background:#fffbe6;font-size:7.5pt;line-height:1.4;white-space:pre-wrap">${escHtml(hw)}</td>`;
+    }
+    bodyRows += `</tr>`;
+  }
+
+  // 出欠・特記事項行
+  bodyRows += `<tr style="background:#f0fff4">`;
+  bodyRows += `<td class="lbl-td" style="background:#f0fff4"><div style="font-size:7pt;font-weight:700;color:#1a6035;line-height:1.2">出欠<br>特記</div></td>`;
+  for (const d of weekDays) {
+    const ds = formatDate(d);
+    const note = (state.weeklyContent[ds] && state.weeklyContent[ds].note) ? state.weeklyContent[ds].note : '';
+    bodyRows += `<td style="padding:3px 4px;background:#f0fff4;font-size:8pt;line-height:1.5;white-space:pre-wrap">${escHtml(note)}</td>`;
+  }
+  bodyRows += `</tr>`;
+
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>週記録</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Hiragino Sans','Meiryo',sans-serif}
+.print-btn{padding:6px 18px;background:#4361ee;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin:8px}
+.page{padding:10mm 10mm 8mm}
+.pg-title{text-align:center;font-size:13pt;font-weight:700;letter-spacing:2px;margin-bottom:1mm}
+.pg-week{text-align:center;font-size:8.5pt;color:#444;margin-bottom:4mm}
+table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8pt}
+table th,table td{border:1px solid #999;vertical-align:top;padding:0}
+.lbl-hd{width:22px;background:#eef}
+.lbl-td{width:22px;background:#eef;text-align:center;vertical-align:middle;padding:2px 1px}
+@page{size:A4 portrait;margin:0}
+@media screen{body{background:#ccc;padding:10mm}.page{background:#fff;margin:0 auto;max-width:210mm;box-shadow:0 2px 8px rgba(0,0,0,.3)}}
+@media print{.print-btn{display:none}-webkit-print-color-adjust:exact;print-color-adjust:exact}
+</style></head><body>
+<div style="text-align:center"><button class="print-btn" onclick="window.print()">印刷する（A4縦）</button></div>
+<div class="page">
+  <div class="pg-title">週　記　録</div>
+  <div class="pg-week">${weekLabel}</div>
+  <table>
+    <thead><tr>${headCols}</tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table>
+</div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
 }
 
 // ─────────────────────────
