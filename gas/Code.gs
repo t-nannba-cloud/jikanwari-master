@@ -145,3 +145,39 @@ function getWeekEvents(startDateStr) {
     return { success: false, error: e.toString() };
   }
 }
+
+function updateEventDescription(jsonStr) {
+  try {
+    const data = JSON.parse(jsonStr);
+    const { dateStr, startStr, content, homework } = data;
+
+    const calendars = CalendarApp.getCalendarsByName('授業');
+    if (!calendars || calendars.length === 0) {
+      return { success: false, error: '「授業」カレンダーが見つかりません' };
+    }
+
+    const parts = dateStr.split('-').map(Number);
+    const startOfDay = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0);
+    const endOfDay   = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59);
+    const events = calendars[0].getEvents(startOfDay, endOfDay);
+
+    const timeParts = startStr.split(':').map(Number);
+    const h = timeParts[0], m = timeParts[1];
+
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      const evStart = ev.getStartTime();
+      if (evStart.getHours() === h && evStart.getMinutes() === m) {
+        let base = (ev.getDescription() || '').replace(/\n?【授業内容】[\s\S]*/, '').trimEnd();
+        let newDesc = base;
+        if (content)  newDesc += '\n【授業内容】' + content;
+        if (homework) newDesc += '\n【宿題・課題】' + homework;
+        ev.setDescription(newDesc.trim());
+        return { success: true };
+      }
+    }
+    return { success: false, error: '対応するイベントが見つかりません' };
+  } catch(e) {
+    return { success: false, error: e.toString() };
+  }
+}

@@ -715,6 +715,43 @@ function syncToCalendar() {
 
 // ───── 週記録タブ ─────
 
+// 日付・時限・曜日から実際に表示する教科名を返す（時間割変更を考慮）
+function getSubjectForDatePeriod(dateStr, period, dow) {
+  const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
+  if (!dayKey) return '';
+  const config = state.calendarConfig[dateStr];
+  const periodMap = config && config.periodMap ? config.periodMap : {};
+  const mapVal = periodMap[period];
+  let cell;
+  if (mapVal && typeof mapVal === 'object') {
+    cell = mapVal;
+  } else {
+    cell = state.timetable[dayKey] && state.timetable[dayKey][mapVal || period];
+  }
+  return cell && cell.subject ? cell.subject : '';
+}
+
+// 日付・時限からプリセットのスロット（開始時刻など）を返す
+function getPeriodSlotForDate(dateStr, period) {
+  const config = state.calendarConfig[dateStr];
+  const presetId = config && config.presetId ? config.presetId : state.activePresetId;
+  const preset = state.presets.find(p => p.id === presetId) || getActivePreset();
+  return preset && preset.slots ? preset.slots[period] : null;
+}
+
+// 日付・時限のカレンダーイベントのメモを更新
+function syncToCalendar(dateStr, period) {
+  const slot = getPeriodSlotForDate(dateStr, period);
+  if (!slot || !slot.start || slot.start === slot.end) return;
+  const dayData = state.weeklyContent[dateStr] && state.weeklyContent[dateStr][period];
+  const content  = dayData ? (dayData.content  || '') : '';
+  const homework = dayData ? (dayData.homework || '') : '';
+  google.script.run
+    .withSuccessHandler(function() {})
+    .withFailureHandler(function() {})
+    .updateEventDescription(JSON.stringify({ dateStr, startStr: slot.start, content, homework }));
+}
+
 function renderWeekRecord() {
   const DOW_JP = ['日','月','火','水','木','金','土'];
   const PERIODS = ['1','2','3','4','5','6'];
@@ -748,6 +785,10 @@ function renderWeekRecord() {
   html += '</tr></thead><tbody>';
 
   for (const period of PERIODS) {
+    // この時限に1日でも授業があるか確認
+    const hasAny = weekDays.some(d => getSubjectForDatePeriod(formatDate(d), period, d.getDay()) !== '');
+    if (!hasAny) continue; // 全曜日で授業なし → 行ごと省略
+
     // 授業内容行
     html += `<tr class="wr-content-row"><td class="wr-lbl-td" rowspan="2">`;
     html += `<div class="wr-period-name">${period}時間目</div>`;
@@ -755,15 +796,18 @@ function renderWeekRecord() {
     for (const d of weekDays) {
       const ds = formatDate(d);
       const dow = d.getDay();
-      const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
-      const cell = dayKey ? (state.timetable[dayKey] && state.timetable[dayKey][period]) : null;
-      const subj = cell && cell.subject ? cell.subject : '';
+      const subj = getSubjectForDatePeriod(ds, period, dow);
       const content = state.weeklyContent[ds] && state.weeklyContent[ds][period]
         ? (state.weeklyContent[ds][period].content || '') : '';
-      html += `<td class="wr-day-td">`;
-      if (subj) html += `<div class="wr-subj">${escHtml(subj)}</div>`;
-      html += `<textarea class="wr-textarea" placeholder="授業内容をメモ…" oninput="saveWeekContent('${ds}','${period}','content',this.value)">${escHtml(content)}</textarea>`;
-      html += `</td>`;
+      if (!subj) {
+        // 授業なし → グレーで非活性表示
+        html += `<td class="wr-day-td" style="background:#f5f5f5;color:#ccc;text-align:center;font-size:11px">—</td>`;
+      } else {
+        html += `<td class="wr-day-td">`;
+        html += `<div class="wr-subj">${escHtml(subj)}</div>`;
+        html += `<textarea class="wr-textarea" placeholder="授業内容…" oninput="saveWeekContent('${ds}','${period}','content',this.value)" onblur="syncToCalendar('${ds}','${period}')">${escHtml(content)}</textarea>`;
+        html += `</td>`;
+      }
     }
     html += `</tr>`;
 
@@ -771,9 +815,15 @@ function renderWeekRecord() {
     html += `<tr class="wr-hw-row"><td class="wr-lbl-td" style="background:#fffbe6"><div class="wr-field-lbl" style="color:#a07000">宿題・課題</div></td>`;
     for (const d of weekDays) {
       const ds = formatDate(d);
+      const dow = d.getDay();
+      const subj = getSubjectForDatePeriod(ds, period, dow);
       const homework = state.weeklyContent[ds] && state.weeklyContent[ds][period]
         ? (state.weeklyContent[ds][period].homework || '') : '';
-      html += `<td class="wr-day-td"><textarea class="wr-hw-textarea" placeholder="宿題・課題…" oninput="saveWeekContent('${ds}','${period}','homework',this.value)">${escHtml(homework)}</textarea></td>`;
+      if (!subj) {
+        html += `<td class="wr-day-td" style="background:#f5f5f5"></td>`;
+      } else {
+        html += `<td class="wr-day-td"><textarea class="wr-hw-textarea" placeholder="宿題・課題…" oninput="saveWeekContent('${ds}','${period}','homework',this.value)" onblur="syncToCalendar('${ds}','${period}')">${escHtml(homework)}</textarea></td>`;
+      }
     }
     html += `</tr>`;
   }
