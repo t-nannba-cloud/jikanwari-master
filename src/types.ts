@@ -30,6 +30,7 @@ export interface CalendarDayConfig {
   presetId: string | null
   isHoliday: boolean
   holidayName?: string
+  memo?: string
 }
 
 export type CalendarConfig = Record<string, CalendarDayConfig>
@@ -40,10 +41,25 @@ export interface Holiday {
   isManual: boolean
 }
 
+export interface DailyTimetable {
+  cells: Record<Period, TimetableCell>
+  presetId?: string
+}
+
+export type DailyTimetables = Record<string, DailyTimetable>
+
+export interface SubjectPreset {
+  id: string
+  name: string
+  color: string
+}
+
 export interface AppData {
   timetable: Timetable
   presets: TimePreset[]
   calendarConfig: CalendarConfig
   holidays: Holiday[]
   activePresetId: string
+  subjectPresets: SubjectPreset[]
+  dailyTimetables: DailyTimetables
 }

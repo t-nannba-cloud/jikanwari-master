@@ -4,9 +4,10 @@ import { TimetableView } from './components/TimetableView'
 import { PresetManager } from './components/PresetManager'
 import { Calendar } from './components/Calendar'
 import { HolidayManager } from './components/HolidayManager'
+import { SubjectManager } from './components/SubjectManager'
 import './App.css'
 
-type Tab = 'timetable' | 'presets' | 'calendar' | 'holidays'
+type Tab = 'timetable' | 'presets' | 'calendar' | 'holidays' | 'subjects'
 
 function App() {
   const {
@@ -16,6 +17,8 @@ function App() {
     setActivePreset,
     updateCalendarConfig,
     updateHolidays,
+    updateSubjectPresets,
+    updateDailyTimetables,
     fetchHolidays,
   } = useAppData()
 
@@ -25,8 +28,9 @@ function App() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'timetable', label: '時間割' },
-    { id: 'presets', label: 'プリセット' },
     { id: 'calendar', label: 'カレンダー' },
+    { id: 'subjects', label: '教科' },
+    { id: 'presets', label: 'プリセット' },
     { id: 'holidays', label: '祝日' },
   ]
 
@@ -35,9 +39,7 @@ function App() {
       <header className="app-header">
         <h1>時間割管理</h1>
         {activePreset && (
-          <span className="header-preset">
-            {activePreset.name}
-          </span>
+          <span className="header-preset">{activePreset.name}</span>
         )}
       </header>
 
@@ -58,6 +60,7 @@ function App() {
           <TimetableView
             timetable={data.timetable}
             activePreset={activePreset}
+            subjectPresets={data.subjectPresets}
             onUpdate={updateTimetable}
           />
         )}
@@ -74,7 +77,11 @@ function App() {
             calendarConfig={data.calendarConfig}
             presets={data.presets}
             holidays={data.holidays}
+            baseTimetable={data.timetable}
+            dailyTimetables={data.dailyTimetables}
+            subjectPresets={data.subjectPresets}
             onUpdateConfig={updateCalendarConfig}
+            onUpdateDailyTimetables={updateDailyTimetables}
             onFetchHolidays={fetchHolidays}
           />
         )}
@@ -83,6 +90,12 @@ function App() {
             holidays={data.holidays}
             onUpdate={updateHolidays}
             onFetchHolidays={fetchHolidays}
+          />
+        )}
+        {activeTab === 'subjects' && (
+          <SubjectManager
+            subjectPresets={data.subjectPresets}
+            onUpdate={updateSubjectPresets}
           />
         )}
       </main>

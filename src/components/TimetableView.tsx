@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import type { Timetable, TimetableCell, DayOfWeek, Period, TimePreset } from '../types'
+import type { Timetable, TimetableCell, DayOfWeek, Period, TimePreset, SubjectPreset } from '../types'
 import { DAYS, PERIODS } from '../types'
 import { CellEditor } from './CellEditor'
 
 interface Props {
   timetable: Timetable
   activePreset: TimePreset | undefined
+  subjectPresets: SubjectPreset[]
   onUpdate: (timetable: Timetable) => void
 }
 
-export function TimetableView({ timetable, activePreset, onUpdate }: Props) {
+export function TimetableView({ timetable, activePreset, subjectPresets, onUpdate }: Props) {
   const [editing, setEditing] = useState<{ day: DayOfWeek; period: Period } | null>(null)
 
   const handleCellClick = (day: DayOfWeek, period: Period) => {
@@ -23,6 +24,11 @@ export function TimetableView({ timetable, activePreset, onUpdate }: Props) {
     updated[editing.day][editing.period] = cell
     onUpdate(updated)
     setEditing(null)
+  }
+
+  const getSubjectColor = (subjectName: string): string | undefined => {
+    const sp = subjectPresets.find((s) => s.name === subjectName)
+    return sp?.color
   }
 
   return (
@@ -55,10 +61,12 @@ export function TimetableView({ timetable, activePreset, onUpdate }: Props) {
                   {DAYS.map((day) => {
                     const cell = timetable[day]?.[period]
                     const isEmpty = !cell?.subject && !cell?.className && !cell?.room
+                    const bgColor = cell?.subject ? getSubjectColor(cell.subject) : undefined
                     return (
                       <td
                         key={day}
                         className={`timetable-cell ${isEmpty ? 'empty' : ''}`}
+                        style={bgColor ? { background: bgColor } : undefined}
                         onClick={() => handleCellClick(day, period)}
                       >
                         {cell?.subject && <div className="cell-subject">{cell.subject}</div>}
@@ -80,6 +88,7 @@ export function TimetableView({ timetable, activePreset, onUpdate }: Props) {
           cell={timetable[editing.day]?.[editing.period] || { subject: '', className: '', room: '' }}
           day={editing.day}
           period={editing.period}
+          subjectPresets={subjectPresets}
           onSave={handleSave}
           onCancel={() => setEditing(null)}
         />

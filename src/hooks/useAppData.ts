@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import type { AppData, Timetable, TimePreset, CalendarConfig, Holiday } from '../types'
+import type { AppData, Timetable, TimePreset, CalendarConfig, Holiday, SubjectPreset, DailyTimetables } from '../types'
 import { loadData, saveData } from '../utils/storage'
 import { fetchJapaneseHolidays } from '../utils/holidays'
 
@@ -30,6 +30,14 @@ export function useAppData() {
     setData((prev) => ({ ...prev, holidays }))
   }, [])
 
+  const updateSubjectPresets = useCallback((subjectPresets: SubjectPreset[]) => {
+    setData((prev) => ({ ...prev, subjectPresets }))
+  }, [])
+
+  const updateDailyTimetables = useCallback((dailyTimetables: DailyTimetables) => {
+    setData((prev) => ({ ...prev, dailyTimetables }))
+  }, [])
+
   const fetchHolidays = useCallback(async (year: number) => {
     const fetched = await fetchJapaneseHolidays(year)
     setData((prev) => {
@@ -52,6 +60,8 @@ export function useAppData() {
     setActivePreset,
     updateCalendarConfig,
     updateHolidays,
+    updateSubjectPresets,
+    updateDailyTimetables,
     fetchHolidays,
   }
 }

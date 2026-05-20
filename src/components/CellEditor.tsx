@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import type { TimetableCell, DayOfWeek, Period } from '../types'
+import type { TimetableCell, DayOfWeek, Period, SubjectPreset } from '../types'
 
 interface Props {
   cell: TimetableCell
-  day: DayOfWeek
+  day: DayOfWeek | string
   period: Period
+  subjectPresets: SubjectPreset[]
   onSave: (cell: TimetableCell) => void
   onCancel: () => void
 }
 
-export function CellEditor({ cell, day, period, onSave, onCancel }: Props) {
+export function CellEditor({ cell, day, period, subjectPresets, onSave, onCancel }: Props) {
   const [subject, setSubject] = useState(cell.subject)
   const [className, setClassName] = useState(cell.className)
   const [room, setRoom] = useState(cell.room)
@@ -23,6 +24,10 @@ export function CellEditor({ cell, day, period, onSave, onCancel }: Props) {
     onSave({ subject: '', className: '', room: '' })
   }
 
+  const handleSubjectClick = (name: string) => {
+    setSubject(name)
+  }
+
   const periodLabel = period === '放課後' ? '放課後' : `${period}時限`
 
   return (
@@ -31,6 +36,21 @@ export function CellEditor({ cell, day, period, onSave, onCancel }: Props) {
         <h3>
           {day}曜 {periodLabel}
         </h3>
+
+        <div className="subject-chips">
+          {subjectPresets.map((sp) => (
+            <button
+              key={sp.id}
+              type="button"
+              className={`subject-chip ${subject === sp.name ? 'selected' : ''}`}
+              style={{ background: subject === sp.name ? sp.color : undefined, borderColor: sp.color }}
+              onClick={() => handleSubjectClick(sp.name)}
+            >
+              {sp.name}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={handleSubmit}>
           <label>
             教科名
@@ -39,7 +59,6 @@ export function CellEditor({ cell, day, period, onSave, onCancel }: Props) {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="例：数学"
-              autoFocus
             />
           </label>
           <label>

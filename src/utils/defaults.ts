@@ -1,4 +1,4 @@
-import type { AppData, Timetable, TimetableCell, TimePreset, Period } from '../types'
+import type { AppData, Timetable, TimetableCell, TimePreset, Period, SubjectPreset } from '../types'
 import { DAYS, PERIODS } from '../types'
 
 function emptyCell(): TimetableCell {
@@ -20,83 +20,78 @@ function createDefaultPresets(): TimePreset[] {
   return [
     {
       id: 'normal',
-      name: '通常日程',
-      visiblePeriods: ['1', '2', '3', '4'],
+      name: '通常日課',
+      visiblePeriods: ['1', '2', '3', '4', '5', '6', '放課後'],
       slots: {
-        // 学活17:30-17:35、休憩17:35-17:40
-        '1': { label: '1時限', start: '17:40', end: '18:20' },
-        // 給食18:20-18:50
-        '2': { label: '2時限', start: '18:50', end: '19:30' },
-        '3': { label: '3時限', start: '19:35', end: '20:15' },
-        '4': { label: '4時限', start: '20:20', end: '21:00' },
-        '5': { label: '5時限', start: '21:05', end: '21:45' },
-        '6': { label: '6時限', start: '21:50', end: '22:30' },
-        '放課後': { label: '放課後', start: '22:35', end: '23:25' },
+        '1': { label: '1時限', start: '08:45', end: '09:35' },
+        '2': { label: '2時限', start: '09:45', end: '10:35' },
+        '3': { label: '3時限', start: '10:45', end: '11:35' },
+        '4': { label: '4時限', start: '11:45', end: '12:35' },
+        '5': { label: '5時限', start: '13:25', end: '14:15' },
+        '6': { label: '6時限', start: '14:25', end: '15:15' },
+        '放課後': { label: '放課後', start: '15:25', end: '16:15' },
       },
     },
     {
       id: '35min',
-      name: '35分日程',
-      visiblePeriods: ['1', '2', '3', '4', '5'],
+      name: '35分授業',
+      visiblePeriods: ['1', '2', '3', '4', '5', '6', '放課後'],
       slots: {
-        // 学活17:30-17:35、休憩17:35-17:40
-        '1': { label: '1時限', start: '17:40', end: '18:15' },
-        // 給食18:15-18:45
-        '2': { label: '2時限', start: '18:45', end: '19:20' },
-        '3': { label: '3時限', start: '19:25', end: '20:00' },
-        '4': { label: '4時限', start: '20:05', end: '20:40' },
-        '5': { label: '5時限', start: '20:40', end: '21:00' },
-        '6': { label: '6時限', start: '20:40', end: '20:40' },
-        '放課後': { label: '放課後', start: '20:40', end: '20:40' },
+        '1': { label: '1時限', start: '08:45', end: '09:20' },
+        '2': { label: '2時限', start: '09:30', end: '10:05' },
+        '3': { label: '3時限', start: '10:15', end: '10:50' },
+        '4': { label: '4時限', start: '11:00', end: '11:35' },
+        '5': { label: '5時限', start: '12:25', end: '13:00' },
+        '6': { label: '6時限', start: '13:10', end: '13:45' },
+        '放課後': { label: '放課後', start: '13:55', end: '14:45' },
       },
     },
     {
       id: '30min',
       name: '30分授業',
-      visiblePeriods: ['1', '2', '3', '4', '5'],
+      visiblePeriods: ['1', '2', '3', '4', '5', '6', '放課後'],
       slots: {
-        // 学活17:30-17:35、休憩17:35-17:40
-        '1': { label: '1時限', start: '17:40', end: '18:10' },
-        // 給食18:10-18:40
-        '2': { label: '2時限', start: '18:40', end: '19:10' },
-        '3': { label: '3時限', start: '19:15', end: '19:45' },
-        '4': { label: '4時限', start: '19:50', end: '20:20' },
-        '5': { label: '5時限', start: '20:20', end: '21:00' },
-        '6': { label: '6時限', start: '20:20', end: '20:20' },
-        '放課後': { label: '放課後', start: '20:20', end: '20:20' },
+        '1': { label: '1時限', start: '08:45', end: '09:15' },
+        '2': { label: '2時限', start: '09:25', end: '09:55' },
+        '3': { label: '3時限', start: '10:05', end: '10:35' },
+        '4': { label: '4時限', start: '10:45', end: '11:15' },
+        '5': { label: '5時限', start: '12:05', end: '12:35' },
+        '6': { label: '6時限', start: '12:45', end: '13:15' },
+        '放課後': { label: '放課後', start: '13:25', end: '14:15' },
       },
     },
     {
       id: 'exam',
-      name: 'テスト日程',
-      visiblePeriods: ['1', '2', '3', '4'],
+      name: 'テスト日課',
+      visiblePeriods: ['1', '2', '3', '放課後'],
       slots: {
-        // 学活17:30-17:35、休憩17:35-17:40
-        '1': { label: '1時限', start: '17:40', end: '18:10' },
-        // 給食18:10-18:40
-        '2': { label: '2時限', start: '18:40', end: '19:20' },
-        '3': { label: '3時限', start: '19:30', end: '20:10' },
-        '4': { label: '4時限', start: '20:20', end: '21:00' },
-        '5': { label: '5時限', start: '21:00', end: '21:00' },
-        '6': { label: '6時限', start: '21:00', end: '21:00' },
-        '放課後': { label: '放課後', start: '21:00', end: '21:00' },
+        '1': { label: '1時限', start: '08:45', end: '09:35' },
+        '2': { label: '2時限', start: '09:55', end: '10:45' },
+        '3': { label: '3時限', start: '11:05', end: '11:55' },
+        '4': { label: '4時限', start: '12:00', end: '12:00' },
+        '5': { label: '5時限', start: '12:00', end: '12:00' },
+        '6': { label: '6時限', start: '12:00', end: '12:00' },
+        '放課後': { label: '放課後', start: '12:05', end: '12:55' },
       },
     },
-    {
-      id: 'ceremony',
-      name: '始業式・終業式・修了式',
-      visiblePeriods: ['1', '放課後'],
-      slots: {
-        // 学活17:30-17:35、休憩17:35-17:40
-        '1': { label: '式', start: '17:40', end: '18:10' },
-        '2': { label: '2時限', start: '18:10', end: '18:10' },
-        '3': { label: '3時限', start: '18:10', end: '18:10' },
-        '4': { label: '4時限', start: '18:10', end: '18:10' },
-        '5': { label: '5時限', start: '18:10', end: '18:10' },
-        '6': { label: '6時限', start: '18:10', end: '18:10' },
-        '放課後': { label: '解散', start: '19:00', end: '19:00' },
-      },
-    },
+  ]
+}
+
+function createDefaultSubjects(): SubjectPreset[] {
+  return [
+    { id: 's1', name: '国語', color: '#fee2e2' },
+    { id: 's2', name: '数学', color: '#dbeafe' },
+    { id: 's3', name: '英語', color: '#dcfce7' },
+    { id: 's4', name: '理科', color: '#fef3c7' },
+    { id: 's5', name: '社会', color: '#fce7f3' },
+    { id: 's6', name: '音楽', color: '#e0e7ff' },
+    { id: 's7', name: '美術', color: '#fae8ff' },
+    { id: 's8', name: '保体', color: '#ccfbf1' },
+    { id: 's9', name: '技術', color: '#fed7aa' },
+    { id: 's10', name: '家庭', color: '#fbcfe8' },
+    { id: 's11', name: '道徳', color: '#e2e8f0' },
+    { id: 's12', name: '学活', color: '#f1f5f9' },
+    { id: 's13', name: '総合', color: '#d9f99d' },
   ]
 }
 
@@ -107,17 +102,11 @@ export function createDefaultData(): AppData {
     calendarConfig: {},
     holidays: [],
     activePresetId: 'normal',
+    subjectPresets: createDefaultSubjects(),
+    dailyTimetables: {},
   }
 }
 
 export function createEmptyCell(): TimetableCell {
   return emptyCell()
-}
-
-export function getNewDayTimetable(): Record<Period, TimetableCell> {
-  const day = {} as Record<Period, TimetableCell>
-  for (const period of PERIODS) {
-    day[period] = emptyCell()
-  }
-  return day
 }
