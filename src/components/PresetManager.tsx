@@ -113,7 +113,7 @@ export function PresetManager({ presets, activePresetId, onUpdatePresets, onSetA
                     </tr>
                   </thead>
                   <tbody>
-                    {PERIODS.map((period) => (
+                    {PERIODS.filter((p) => p !== '6').map((period) => (
                       <tr key={period}>
                         <td>{period === '放課後' ? '放課後' : `${period}時限`}</td>
                         <td>

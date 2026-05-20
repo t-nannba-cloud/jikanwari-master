@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
+
+.header { background: #4361ee; color: white; padding: 14px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+.header h1 { font-size: 20px; font-weight: 700; }
+.active-preset-badge { background: rgba(255,255,255,0.25); padding: 3px 10px; border-radius: 12px; font-size: 13px; }
+
+.tabs { display: flex; background: white; border-bottom: 2px solid #e0e0e0; }
+.tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-size: 14px; color: #666; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.tab.active { color: #4361ee; border-bottom-color: #4361ee; font-weight: 600; }
+
+.content { padding: 16px; max-width: 900px; margin: 0 auto; }
+
+.timetable-wrap { overflow-x: auto; }
+.timetable { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-width: 500px; }
+.timetable th { background: #4361ee; color: white; padding: 10px 6px; text-align: center; font-size: 14px; }
+.timetable td { border: 1px solid #e8e8e8; padding: 0; vertical-align: top; }
+.period-cell { width: 80px; padding: 8px 6px; text-align: center; background: #f8f9ff; }
+.period-label { font-size: 13px; font-weight: 600; color: #4361ee; }
+.period-time { font-size: 10px; color: #888; margin-top: 2px; }
+.cell { min-height: 60px; padding: 6px; cursor: pointer; transition: background 0.15s; }
+.cell:hover { background: #f0f4ff; }
+.cell.empty { display: flex; align-items: center; justify-content: center; color: #ccc; font-size: 20px; }
+.cell-subject { font-size: 13px; font-weight: 600; }
+.cell-class { font-size: 11px; color: #666; }
+.cell-room { font-size: 11px; color: #888; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal { background: white; border-radius: 12px; padding: 24px; width: 90%; max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+.modal h3 { margin-bottom: 16px; color: #4361ee; }
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+.form-group input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+.modal-buttons { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+
+.btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.btn-primary { background: #4361ee; color: white; }
+.btn-secondary { background: #e0e0e0; color: #333; }
+.btn-danger { background: #e63946; color: white; }
+
+.preset-selector { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+.preset-selector select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+.preset-list { display: flex; flex-direction: column; gap: 12px; }
+.preset-card { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.preset-card-header { display: flex; justify-content: space-between; align-items: center; }
+.preset-card-name { font-weight: 600; font-size: 15px; }
+.preset-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+.preset-table th { background: #f0f4ff; padding: 6px 8px; text-align: left; }
+.preset-table td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; }
+.preset-table input[type=time] { border: 1px solid #ddd; border-radius: 4px; padding: 4px; font-size: 12px; }
+
+.calendar-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px; }
+.calendar-nav button:not(.btn) { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 16px; }
+.calendar-title { font-size: 18px; font-weight: 600; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: #e0e0e0; border-radius: 8px; overflow: hidden; }
+.cal-header { background: #4361ee; color: white; text-align: center; padding: 8px 4px; font-size: 13px; font-weight: 600; }
+.cal-header.sun { color: #ffb3ba; }
+.cal-header.sat { color: #b3d9ff; }
+.cal-day { background: white; min-height: 70px; padding: 4px; }
+.cal-day.empty { background: #fafafa; }
+.cal-day.weekend { background: #f8f8f8; }
+.cal-day.today { outline: 2px solid #4361ee; outline-offset: -2px; }
+.day-num { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.day-num.sun { color: #e63946; }
+.day-num.sat { color: #4361ee; }
+.day-preset { width: 100%; font-size: 10px; padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; margin-top: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+.c0{background:#4361ee} .c1{background:#e63946} .c2{background:#2ec4b6} .c3{background:#ff9f1c} .c4{background:#9d4edd}
+
+.subject-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.subject-btn { padding: 6px 12px; border: 1px solid #4361ee; border-radius: 20px; background: white; color: #4361ee; cursor: pointer; font-size: 13px; }
+.subject-btn:hover, .subject-btn.selected { background: #4361ee; color: white; }
+
+.subject-manager { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 12px; }
+.subject-manager h3 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+.subject-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.subject-tag { display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f0f4ff; border-radius: 20px; font-size: 13px; }
+.subject-tag button { background: none; border: none; cursor: pointer; color: #999; font-size: 15px; line-height: 1; padding: 0; }
+.subject-add { display: flex; gap: 8px; }
+.subject-add input { flex: 1; padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+
+@media (max-width: 600px) {
+  .content { padding: 8px; }
+  .header h1 { font-size: 16px; }
+}
+
+/* 週記録タブ */
+.wr-nav{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.wr-nav button:not(.btn){background:white;border:1px solid #ddd;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:15px}
+.wr-nav-title{font-size:16px;font-weight:600;min-width:160px;text-align:center}
+.wr-table{width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);font-size:13px}
+.wr-table th,.wr-table td{border:1px solid #e8e8e8;padding:0}
+.wr-table thead th{background:#4361ee;color:white;padding:8px 4px;text-align:center;font-size:13px}
+.wr-table thead th.sat{color:#b3d9ff}
+.wr-table thead th.hol{color:#ffb3ba}
+.wr-lbl-td{width:68px;background:#f8f9ff;padding:5px 4px;text-align:center;vertical-align:middle}
+.wr-period-name{font-size:11px;font-weight:700;color:#4361ee;line-height:1.2}
+.wr-field-lbl{font-size:9px;color:#aaa;margin-top:3px}
+.wr-day-td{padding:3px 5px;vertical-align:top}
+.wr-subj{font-size:10px;color:#888;margin-bottom:1px;font-weight:600}
+.wr-textarea{width:100%;min-height:44px;border:none;resize:vertical;font-size:12px;font-family:inherit;background:transparent;outline:none;padding:2px;line-height:1.5}
+.wr-textarea:focus{background:#f0f4ff;border-radius:3px}
+.wr-hw-row>td{background:#fffbe6}
+.wr-hw-textarea{width:100%;min-height:28px;border:none;resize:vertical;font-size:11px;font-family:inherit;background:transparent;outline:none;padding:2px;color:#7a6000;line-height:1.4}
+.wr-hw-textarea:focus{background:#fff8d6;border-radius:3px}
+.wr-note-row>td{background:#f0fff4}
+.wr-note-textarea{width:100%;min-height:32px;border:none;resize:vertical;font-size:12px;font-family:inherit;background:transparent;outline:none;padding:2px;color:#1a6035;line-height:1.4}
+.wr-note-textarea:focus{background:#e0ffe8;border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>週案</h1>
+  <span class="active-preset-badge" id="activePresetLabel"></span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('timetable')">時間割</div>
+  <div class="tab" onclick="switchTab('presets')">プリセット</div>
+  <div class="tab" onclick="switchTab('calendar')">カレンダー</div>
+  <div class="tab" onclick="switchTab('record')">週記録</div>
+  <div class="tab" onclick="switchTab('print')">印刷</div>
+</div>
+
+<div class="content">
+  <div id="tab-timetable"></div>
+  <div id="tab-presets" style="display:none"></div>
+  <div id="tab-calendar" style="display:none"></div>
+  <div id="tab-record" style="display:none"></div>
+  <div id="tab-print" style="display:none"></div>
+</div>
+
+<div id="toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:white;padding:10px 20px;border-radius:8px;font-size:14px;z-index:2000;white-space:nowrap"></div>
+
+<div class="modal-overlay" id="periodMapModal" style="display:none">
+  <div class="modal" style="max-width:420px">
+    <h3 id="periodMapTitle">時間割変更</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:12px">各枠に表示する時間目の内容を選んでください</p>
+    <div id="periodMapBody"></div>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closePeriodMapModal()">キャンセル</button>
+      <button class="btn btn-danger" onclick="clearPeriodMap()">変更をリセット</button>
+      <button class="btn btn-primary" onclick="savePeriodMap()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cellModal" style="display:none">
+  <div class="modal">
+    <h3 id="cellModalTitle">授業を編集</h3>
+    <div class="form-group">
+      <label>教科</label>
+      <div class="subject-picker" id="subjectPicker"></div>
+      <input type="text" id="inputSubject" placeholder="例：数学" oninput="syncSubjectPicker()">
+    </div>
+    <div class="form-group">
+      <label>クラス</label>
+      <input type="text" id="inputClass" placeholder="例：2年1組">
+    </div>
+    <div class="form-group">
+      <label>場所</label>
+      <input type="text" id="inputRoom" placeholder="例：理科室">
+    </div>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-danger" onclick="clearCell()">クリア</button>
+      <button class="btn btn-primary" onclick="saveCell()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['月','火','水','木','金','土'];
+const ALL_PERIODS = ['1','2','3','4','5','6','放課後'];
+
+// 日本の祝日（2024〜2027）
+const HOLIDAYS = new Set([
+  // 2024
+  '2024-01-01','2024-01-08','2024-02-11','2024-02-12','2024-02-23',
+  '2024-03-20','2024-04-29','2024-05-03','2024-05-04','2024-05-05','2024-05-06',
+  '2024-07-15','2024-08-11','2024-08-12','2024-09-16','2024-09-22','2024-09-23',
+  '2024-10-14','2024-11-03','2024-11-04','2024-11-23',
+  // 2025
+  '2025-01-01','2025-01-13','2025-02-11','2025-02-23','2025-02-24',
+  '2025-03-20','2025-04-29','2025-05-03','2025-05-04','2025-05-05','2025-05-06',
+  '2025-07-21','2025-08-11','2025-09-15','2025-09-23',
+  '2025-10-13','2025-11-03','2025-11-23','2025-11-24',
+  // 2026
+  '2026-01-01','2026-01-12','2026-02-11','2026-02-23',
+  '2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06',
+  '2026-07-20','2026-08-11','2026-09-21','2026-09-23',
+  '2026-10-12','2026-11-03','2026-11-23',
+  // 2027
+  '2027-01-01','2027-01-11','2027-02-11','2027-02-23',
+  '2027-03-21','2027-04-29','2027-05-03','2027-05-04','2027-05-05',
+  '2027-07-19','2027-08-11','2027-09-20','2027-09-23',
+  '2027-10-11','2027-11-03','2027-11-23',
+]);
+function isHoliday(dateStr) { return HOLIDAYS.has(dateStr); }
+
+const DEFAULT_PRESETS = [
+  {
+    id:'normal', name:'通常授業', visiblePeriods:['1','2','3','4'],
+    slots:{
+      '1':{label:'1時間目',start:'17:40',end:'18:20'},
+      '2':{label:'2時間目',start:'18:50',end:'19:30'},
+      '3':{label:'3時間目',start:'19:35',end:'20:15'},
+      '4':{label:'4時間目',start:'20:20',end:'21:00'},
+      '5':{label:'5時間目',start:'21:05',end:'21:45'},
+      '6':{label:'6時間目',start:'21:50',end:'22:30'},
+      '放課後':{label:'放課後',start:'22:35',end:'23:25'},
+    }
+  },
+  {
+    id:'35min', name:'35分日程', visiblePeriods:['1','2','3','4','5'],
+    slots:{
+      '1':{label:'1時間目',start:'17:40',end:'18:15'},
+      '2':{label:'2時間目',start:'18:45',end:'19:20'},
+      '3':{label:'3時間目',start:'19:25',end:'20:00'},
+      '4':{label:'4時間目',start:'20:05',end:'20:40'},
+      '5':{label:'5時間目',start:'20:40',end:'21:00'},
+      '6':{label:'6時間目',start:'20:40',end:'20:40'},
+      '放課後':{label:'放課後',start:'20:40',end:'20:40'},
+    }
+  },
+  {
+    id:'30min', name:'30分授業', visiblePeriods:['1','2','3','4','5'],
+    slots:{
+      '1':{label:'1時間目',start:'17:40',end:'18:10'},
+      '2':{label:'2時間目',start:'18:40',end:'19:10'},
+      '3':{label:'3時間目',start:'19:15',end:'19:45'},
+      '4':{label:'4時間目',start:'19:50',end:'20:20'},
+      '5':{label:'5時間目',start:'20:20',end:'21:00'},
+      '6':{label:'6時間目',start:'20:20',end:'20:20'},
+      '放課後':{label:'放課後',start:'20:20',end:'20:20'},
+    }
+  },
+  {
+    id:'exam', name:'テスト日程', visiblePeriods:['1','2','3','4'],
+    slots:{
+      '1':{label:'1時間目',start:'17:40',end:'18:10'},
+      '2':{label:'2時間目',start:'18:40',end:'19:20'},
+      '3':{label:'3時間目',start:'19:30',end:'20:10'},
+      '4':{label:'4時間目',start:'20:20',end:'21:00'},
+      '5':{label:'5時間目',start:'21:00',end:'21:00'},
+      '6':{label:'6時間目',start:'21:00',end:'21:00'},
+      '放課後':{label:'放課後',start:'21:00',end:'21:00'},
+    }
+  },
+  {
+    id:'ceremony', name:'始業式・終業式・修了式', visiblePeriods:['1','放課後'],
+    slots:{
+      '1':{label:'式',start:'17:40',end:'18:10'},
+      '2':{label:'2時間目',start:'18:10',end:'18:10'},
+      '3':{label:'3時間目',start:'18:10',end:'18:10'},
+      '4':{label:'4時間目',start:'18:10',end:'18:10'},
+      '5':{label:'5時間目',start:'18:10',end:'18:10'},
+      '6':{label:'6時間目',start:'18:10',end:'18:10'},
+      '放課後':{label:'解散',start:'19:00',end:'19:00'},
+    }
+  },
+];
+
+function createEmptyTimetable() {
+  const t = {};
+  for (const day of DAYS) {
+    t[day] = {};
+    for (const p of ALL_PERIODS) t[day][p] = {subject:'',className:'',room:''};
+  }
+  return t;
+}
+
+const DEFAULT_SUBJECTS = ['国語','算数','数学','理科','社会','英語','音楽','体育','図工','美術','家庭','技術','道徳','総合','学活','自習'];
+
+function createDefaultData() {
+  return {
+    timetable: createEmptyTimetable(),
+    classes: [
+      { name: 'クラス1', timetable: createEmptyTimetable() },
+      { name: 'クラス2', timetable: createEmptyTimetable() }
+    ],
+    presets: DEFAULT_PRESETS, calendarConfig: {}, activePresetId: 'normal',
+    subjects: DEFAULT_SUBJECTS.slice(), weeklyContent: {}
+  };
+}
+
+let state = createDefaultData();
+let currentTab = 'timetable';
+let activeTimetableView = 'class0'; // 'self' | 'class0' | 'class1'
+let weekRecordMonday = getMondayOfWeek(new Date());
+let newSubjectInput = '';
+let editingCell = null;
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth() + 1;
+
+function init() {
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result && result.data) {
+        try {
+          const loaded = JSON.parse(result.data);
+          state = Object.assign(createDefaultData(), loaded);
+          if (!state.presets || !state.presets.length) state.presets = DEFAULT_PRESETS;
+          if (!state.subjects || !state.subjects.length) state.subjects = DEFAULT_SUBJECTS.slice();
+          // migrate old classTimetable → classes[0]
+          if (!state.classes) {
+            state.classes = [
+              { name: 'クラス1', timetable: state.classTimetable || createEmptyTimetable() },
+              { name: 'クラス2', timetable: createEmptyTimetable() }
+            ];
+            delete state.classTimetable;
+          }
+          if (state.classes.length < 2) state.classes.push({ name: 'クラス2', timetable: createEmptyTimetable() });
+          if (!state.weeklyContent) state.weeklyContent = {};
+        } catch(e) { state = createDefaultData(); }
+      }
+      render();
+    })
+    .withFailureHandler(function() { render(); })
+    .loadData();
+}
+
+function saveState() {
+  google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(){}).saveData(JSON.stringify(state));
+}
+
+function getActivePreset() {
+  return state.presets.find(p => p.id === state.activePresetId) || state.presets[0];
+}
+
+function presetColor(i) { return 'c' + (i % 5); }
+
+function formatDate(date) {
+  return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+}
+
+function getMondayOfWeek(date) {
+  const d = new Date(date);
+  const dow = d.getDay();
+  d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  const TAB_NAMES = ['timetable','presets','calendar','record','print'];
+  document.querySelectorAll('.tab').forEach((el, i) => {
+    el.classList.toggle('active', TAB_NAMES[i] === tab);
+  });
+  TAB_NAMES.forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+  });
+  render();
+}
+
+function render() {
+  const preset = getActivePreset();
+  document.getElementById('activePresetLabel').textContent = preset ? preset.name : '';
+  if (currentTab === 'timetable') renderTimetable();
+  else if (currentTab === 'presets') renderPresets();
+  else if (currentTab === 'calendar') renderCalendar();
+  else if (currentTab === 'record') renderWeekRecord();
+  else if (currentTab === 'print') renderPrintTab();
+}
+
+function renderTimetable() {
+  const preset = getActivePreset();
+  const periods = preset ? (preset.visiblePeriods || ALL_PERIODS) : ALL_PERIODS;
+  const tt = getActiveTimetable();
+  const c0name = state.classes[0].name;
+  const c1name = state.classes[1].name;
+  let html = `<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+    <button class="btn ${activeTimetableView==='class0'?'btn-primary':'btn-secondary'}" onclick="switchTimetableView('class0')">${c0name}</button>
+    <button class="btn ${activeTimetableView==='class1'?'btn-primary':'btn-secondary'}" onclick="switchTimetableView('class1')">${c1name}</button>
+    <button class="btn ${activeTimetableView==='self'?'btn-primary':'btn-secondary'}" onclick="switchTimetableView('self')">自分の時間割</button>
+    ${activeTimetableView!=='self' ? `<input type="text" value="${activeTimetableView==='class0'?c0name:c1name}" onchange="renameClass(this.value)" style="padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:110px" placeholder="クラス名を変更">` : ''}
+  </div>`;
+  html += '<div class="timetable-wrap"><table class="timetable"><thead><tr><th class="period-cell">時間目</th>';
+  for (const day of DAYS) html += `<th>${day}</th>`;
+  html += '</tr></thead><tbody>';
+  for (const period of periods) {
+    const slot = preset && preset.slots ? preset.slots[period] : null;
+    html += '<tr><td class="period-cell">';
+    html += `<div class="period-label">${slot ? slot.label : (period === '放課後' ? '放課後' : period+'時間目')}</div>`;
+    if (slot && slot.start && slot.start !== slot.end) html += `<div class="period-time">${slot.start}〜${slot.end}</div>`;
+    html += '</td>';
+    for (const day of DAYS) {
+      const cell = tt[day] && tt[day][period];
+      const isEmpty = !cell || (!cell.subject && !cell.className && !cell.room);
+      html += `<td><div class="cell ${isEmpty?'empty':''}" onclick="openCellModal('${day}','${period}')">`;
+      if (isEmpty) html += '+';
+      else {
+        if (cell.subject) html += `<div class="cell-subject">${cell.subject}</div>`;
+        if (cell.className) html += `<div class="cell-class">${cell.className}</div>`;
+        if (cell.room) html += `<div class="cell-room">${cell.room}</div>`;
+      }
+      html += '</div></td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  document.getElementById('tab-timetable').innerHTML = html;
+}
+
+function switchTimetableView(view) {
+  activeTimetableView = view;
+  renderTimetable();
+}
+function renameClass(name) {
+  const idx = activeTimetableView === 'class0' ? 0 : 1;
+  state.classes[idx].name = name.trim() || state.classes[idx].name;
+  saveState();
+  renderTimetable();
+}
+
+function renderPresets() {
+  let html = '<div class="subject-manager"><h3>教科プリセット</h3><div class="subject-tags">';
+  for (let i = 0; i < state.subjects.length; i++) {
+    const s = state.subjects[i].replace(/'/g,"\\'");
+    html += `<div class="subject-tag"><span>${state.subjects[i]}</span><button onclick="removeSubject(${i})" title="削除">×</button></div>`;
+  }
+  html += '</div><div class="subject-add"><input type="text" id="newSubjectInput" placeholder="教科名を入力" onkeydown="if(event.key===\'Enter\')addSubject()"><button class="btn btn-primary" onclick="addSubject()">追加</button></div></div>';
+
+  html += '<div class="preset-selector"><label>現在のプリセット：</label><select onchange="setActivePreset(this.value)">';
+  for (const p of state.presets) html += `<option value="${p.id}" ${p.id===state.activePresetId?'selected':''}>${p.name}</option>`;
+  html += '</select></div><div class="preset-list">';
+  const displayPeriods = ALL_PERIODS.filter(p => p !== '6');
+  for (const p of state.presets) {
+    html += `<div class="preset-card"><div class="preset-card-header"><span class="preset-card-name">${p.name}</span>`;
+    html += `<button class="btn btn-secondary" onclick="toggleEdit('${p.id}')">編集</button></div>`;
+    html += `<div id="edit-${p.id}" style="display:none"><table class="preset-table"><thead><tr><th>時間目</th><th>開始</th><th>終了</th></tr></thead><tbody>`;
+    for (const period of displayPeriods) {
+      const slot = p.slots[period];
+      html += `<tr><td>${slot.label}</td>`;
+      html += `<td><input type="time" value="${slot.start}" onchange="updateSlot('${p.id}','${period}','start',this.value)"></td>`;
+      html += `<td><input type="time" value="${slot.end}" onchange="updateSlot('${p.id}','${period}','end',this.value)"></td></tr>`;
+    }
+    html += '</tbody></table></div></div>';
+  }
+  html += '</div>';
+  document.getElementById('tab-presets').innerHTML = html;
+}
+
+function renderCalendar() {
+  const todayStr = formatDate(new Date());
+  const firstDay = new Date(calYear, calMonth-1, 1);
+  const lastDay = new Date(calYear, calMonth, 0);
+  let html = '<div class="legend">';
+  for (let i = 0; i < state.presets.length; i++) {
+    html += `<div class="legend-item"><div class="legend-dot ${presetColor(i)}"></div><span>${state.presets[i].name}</span></div>`;
+  }
+  html += '</div>';
+  const c0name = state.classes[0].name;
+  const c1name = state.classes[1].name;
+  html += `<div class="calendar-nav" style="flex-wrap:wrap;gap:6px"><button onclick="calPrev()">＜</button><span class="calendar-title">${calYear}年${calMonth}月</span><button onclick="calNext()">＞</button><button class="btn btn-secondary" onclick="setAllNormal()" style="font-size:12px">通常授業を一括設定</button><button class="btn btn-danger" onclick="clearAllDays()" style="font-size:12px">全解除</button><button class="btn btn-secondary" onclick="syncToCalendar()" style="font-size:12px">自分のカレンダーに追加</button></div>`;
+  html += '<div class="calendar-grid">';
+  ['日','月','火','水','木','金','土'].forEach((d,i) => {
+    html += `<div class="cal-header ${i===0?'sun':i===6?'sat':''}">${d}</div>`;
+  });
+  for (let i = 0; i < firstDay.getDay(); i++) html += '<div class="cal-day empty"></div>';
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const date = new Date(calYear, calMonth-1, d);
+    const dow = date.getDay();
+    const dateStr = formatDate(date);
+    const config = state.calendarConfig[dateStr];
+    html += `<div class="cal-day ${dow===0||dow===6?'weekend':''} ${dateStr===todayStr?'today':''}">`;
+    html += `<div class="day-num ${dow===0?'sun':dow===6?'sat':''}">${d}</div>`;
+    if (dow !== 0) {
+      html += `<select class="day-preset" onchange="setDayPreset('${dateStr}',this.value)"><option value="">−</option>`;
+      for (const p of state.presets) {
+        html += `<option value="${p.id}" ${config&&config.presetId===p.id?'selected':''}>${p.name}</option>`;
+      }
+      html += '</select>';
+      if (config && config.presetId) {
+        const hasMap = config.periodMap && Object.keys(config.periodMap).length > 0;
+        html += `<div onclick="openPeriodMapModal('${dateStr}')" style="font-size:10px;color:${hasMap?'#e63946':'#4361ee'};cursor:pointer;margin-top:2px">${hasMap?'⚡変更中':'＋変更'}</div>`;
+      }
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  document.getElementById('tab-calendar').innerHTML = html;
+}
+
+function setActivePreset(id) { state.activePresetId = id; render(); saveState(); }
+function toggleEdit(id) { const el = document.getElementById('edit-'+id); if(el) el.style.display = el.style.display==='none'?'':'none'; }
+function updateSlot(presetId, period, field, value) {
+  const p = state.presets.find(p=>p.id===presetId);
+  if (p && p.slots[period]) { p.slots[period][field] = value; saveState(); }
+}
+function renderSubjectPicker() {
+  const current = document.getElementById('inputSubject').value.trim();
+  let html = '';
+  for (const s of state.subjects) {
+    html += `<button class="subject-btn ${s===current?'selected':''}" onclick="selectSubject('${s.replace(/'/g,"\\'")}',this)">${s}</button>`;
+  }
+  document.getElementById('subjectPicker').innerHTML = html;
+}
+function selectSubject(name, btn) {
+  document.getElementById('inputSubject').value = name;
+  document.querySelectorAll('#subjectPicker .subject-btn').forEach(b => b.classList.remove('selected'));
+  if (btn) btn.classList.add('selected');
+}
+function syncSubjectPicker() {
+  const current = document.getElementById('inputSubject').value.trim();
+  document.querySelectorAll('#subjectPicker .subject-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent === current);
+  });
+}
+function getActiveTimetable() {
+  if (activeTimetableView === 'self') return state.timetable;
+  if (activeTimetableView === 'class1') return state.classes[1].timetable;
+  return state.classes[0].timetable;
+}
+function openCellModal(day, period) {
+  editingCell = {day, period};
+  const tt = getActiveTimetable();
+  const cell = tt[day] && tt[day][period];
+  document.getElementById('inputSubject').value = cell ? cell.subject : '';
+  document.getElementById('inputClass').value = cell ? cell.className : '';
+  document.getElementById('inputRoom').value = cell ? cell.room : '';
+  const preset = getActivePreset();
+  const slot = preset && preset.slots ? preset.slots[period] : null;
+  const viewLabel = activeTimetableView === 'self' ? '自分' : activeTimetableView === 'class1' ? state.classes[1].name : state.classes[0].name;
+  document.getElementById('cellModalTitle').textContent = `[${viewLabel}] ${day}曜 ${slot ? slot.label : period+'時間目'}`;
+  renderSubjectPicker();
+  document.getElementById('cellModal').style.display = 'flex';
+}
+function closeModal() { document.getElementById('cellModal').style.display = 'none'; editingCell = null; }
+function saveCell() {
+  if (!editingCell) return;
+  const {day, period} = editingCell;
+  const tt = getActiveTimetable();
+  if (!tt[day]) tt[day] = {};
+  tt[day][period] = {
+    subject: document.getElementById('inputSubject').value.trim(),
+    className: document.getElementById('inputClass').value.trim(),
+    room: document.getElementById('inputRoom').value.trim(),
+  };
+  closeModal(); render(); saveState();
+}
+function clearCell() {
+  if (!editingCell) return;
+  const {day, period} = editingCell;
+  const tt = getActiveTimetable();
+  if (tt[day]) tt[day][period] = {subject:'',className:'',room:''};
+  closeModal(); render(); saveState();
+}
+function setDayPreset(dateStr, presetId) {
+  if (!state.calendarConfig[dateStr]) state.calendarConfig[dateStr] = {};
+  state.calendarConfig[dateStr].presetId = presetId || null;
+  if (!presetId) delete state.calendarConfig[dateStr].periodMap;
+  saveState(); renderCalendar();
+}
+
+let editingDateStr = null;
+function openPeriodMapModal(dateStr) {
+  editingDateStr = dateStr;
+  const config = state.calendarConfig[dateStr];
+  const preset = config && config.presetId ? state.presets.find(p => p.id === config.presetId) : null;
+  if (!preset) return;
+  const periodMap = config.periodMap || {};
+  const visiblePeriods = preset.visiblePeriods || ALL_PERIODS.filter(p => p !== '6');
+  const parts = dateStr.split('-');
+  const dow = new Date(dateStr).getDay();
+  const dowName = ['日','月','火','水','木','金','土'][dow];
+  document.getElementById('periodMapTitle').textContent = `${parseInt(parts[1])}/${parseInt(parts[2])}（${dowName}）の時間割変更`;
+  let html = '';
+  for (const period of visiblePeriods) {
+    const slot = preset.slots[period];
+    const label = slot ? slot.label : period + '限';
+    const mapVal = periodMap[period];
+    const isCustom = mapVal && typeof mapVal === 'object';
+    const currentSel = isCustom ? '__custom__' : (mapVal || period);
+    const customSubject = isCustom ? (mapVal.subject || '') : '';
+    const customRoom = isCustom ? (mapVal.room || '') : '';
+    html += `<div style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="min-width:60px;font-size:13px;font-weight:600">${label}枠</span>
+        <select id="pmap_${period}" onchange="onPeriodMapChange('${period}')" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">`;
+    for (const opt of visiblePeriods) {
+      const optSlot = preset.slots[opt];
+      const optLabel = optSlot ? optSlot.label : opt + '限';
+      html += `<option value="${opt}" ${currentSel===opt?'selected':''}>${optLabel}の内容</option>`;
+    }
+    html += `<option value="__custom__" ${isCustom?'selected':''}>記述式</option>
+        </select>
+      </div>
+      <div id="pmap_custom_${period}" style="margin-top:6px;margin-left:68px;display:${isCustom?'flex':'none'};gap:6px">
+        <input type="text" id="pmap_subject_${period}" placeholder="教科名" value="${customSubject}" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+        <input type="text" id="pmap_room_${period}" placeholder="場所" value="${customRoom}" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+      </div>
+    </div>`;
+  }
+  document.getElementById('periodMapBody').innerHTML = html;
+  document.getElementById('periodMapModal').style.display = 'flex';
+}
+function onPeriodMapChange(period) {
+  const sel = document.getElementById('pmap_' + period);
+  const customDiv = document.getElementById('pmap_custom_' + period);
+  if (customDiv) customDiv.style.display = sel.value === '__custom__' ? 'flex' : 'none';
+}
+function closePeriodMapModal() {
+  document.getElementById('periodMapModal').style.display = 'none';
+  editingDateStr = null;
+}
+function savePeriodMap() {
+  if (!editingDateStr) return;
+  const config = state.calendarConfig[editingDateStr];
+  const preset = state.presets.find(p => p.id === config.presetId);
+  const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PERIODS.filter(p => p !== '6')) : [];
+  const periodMap = {};
+  let hasChange = false;
+  for (const period of visiblePeriods) {
+    const el = document.getElementById('pmap_' + period);
+    if (!el) continue;
+    if (el.value === '__custom__') {
+      const subject = (document.getElementById('pmap_subject_' + period) || {}).value || '';
+      const room = (document.getElementById('pmap_room_' + period) || {}).value || '';
+      periodMap[period] = { subject: subject.trim(), room: room.trim() };
+      hasChange = true;
+    } else if (el.value !== period) {
+      periodMap[period] = el.value;
+      hasChange = true;
+    }
+  }
+  config.periodMap = hasChange ? periodMap : {};
+  saveState(); closePeriodMapModal(); renderCalendar();
+}
+function clearPeriodMap() {
+  if (!editingDateStr) return;
+  if (state.calendarConfig[editingDateStr]) delete state.calendarConfig[editingDateStr].periodMap;
+  saveState(); closePeriodMapModal(); renderCalendar();
+}
+function calPrev() { if(calMonth===1){calMonth=12;calYear--;}else calMonth--; renderCalendar(); }
+function calNext() { if(calMonth===12){calMonth=1;calYear++;}else calMonth++; renderCalendar(); }
+
+function setAllNormal() {
+  const normalPreset = state.presets.find(p => p.id === 'normal') || state.presets[0];
+  if (!normalPreset) return;
+  const lastDay = new Date(calYear, calMonth, 0).getDate();
+  for (let d = 1; d <= lastDay; d++) {
+    const date = new Date(calYear, calMonth - 1, d);
+    const dow = date.getDay();
+    if (dow === 0 || dow === 6) continue; // 日・土 を除く
+    const dateStr = formatDate(date);
+    if (isHoliday(dateStr)) continue; // 祝日を除く
+    if (!state.calendarConfig[dateStr]) state.calendarConfig[dateStr] = {};
+    state.calendarConfig[dateStr].presetId = normalPreset.id;
+  }
+  saveState(); renderCalendar();
+}
+
+function clearAllDays() {
+  if (!confirm(calYear + '年' + calMonth + '月の全ての日程設定を解除しますか？')) return;
+  const lastDay = new Date(calYear, calMonth, 0).getDate();
+  for (let d = 1; d <= lastDay; d++) {
+    const dateStr = formatDate(new Date(calYear, calMonth - 1, d));
+    delete state.calendarConfig[dateStr];
+  }
+  saveState(); renderCalendar();
+}
+
+function showToast(msg, duration) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(function() { el.style.display = 'none'; }, duration || 3000);
+}
+
+function syncToCalendar() {
+  // Count days with preset
+  const firstDay = new Date(calYear, calMonth-1, 1);
+  const lastDay = new Date(calYear, calMonth, 0);
+  let days = 0;
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const date = new Date(calYear, calMonth-1, d);
+    const dateStr = formatDate(date);
+    const config = state.calendarConfig[dateStr];
+    if (config && config.presetId) days++;
+  }
+  if (days === 0) { showToast('カレンダーに日程が設定されていません'); return; }
+
+  if (!confirm(calYear + '年' + calMonth + '月の予定（' + days + '日分）をGoogleカレンダーに追加します。\nよろしいですか？')) return;
+
+  showToast('追加中...', 30000);
+  const payload = JSON.stringify({ year: calYear, month: calMonth, state: { timetable: state.timetable, presets: state.presets, calendarConfig: state.calendarConfig } }); // calendarConfig includes periodMap
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        showToast(calMonth + '月の予定を' + result.count + '件追加しました');
+      } else {
+        showToast('エラー：' + result.error);
+      }
+    })
+    .withFailureHandler(function(err) {
+      showToast('エラーが発生しました：' + (err.message || err));
+    })
+    .createCalendarEvents(payload);
+}
+
+// ───── 週記録タブ ─────
+
+// 日付・時限・曜日から実際に表示する教科名を返す（時間割変更を考慮）
+function getSubjectForDatePeriod(dateStr, period, dow) {
+  const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
+  if (!dayKey) return '';
+  const config = state.calendarConfig[dateStr];
+  const periodMap = config && config.periodMap ? config.periodMap : {};
+  const mapVal = periodMap[period];
+  let cell;
+  if (mapVal && typeof mapVal === 'object') {
+    cell = mapVal;
+  } else {
+    cell = state.timetable[dayKey] && state.timetable[dayKey][mapVal || period];
+  }
+  return cell && cell.subject ? cell.subject : '';
+}
+
+// 日付・時限からプリセットのスロット（開始時刻など）を返す
+function getPeriodSlotForDate(dateStr, period) {
+  const config = state.calendarConfig[dateStr];
+  const presetId = config && config.presetId ? config.presetId : state.activePresetId;
+  const preset = state.presets.find(p => p.id === presetId) || getActivePreset();
+  return preset && preset.slots ? preset.slots[period] : null;
+}
+
+// 日付・時限のカレンダーイベントのメモを更新
+function syncToCalendar(dateStr, period) {
+  const slot = getPeriodSlotForDate(dateStr, period);
+  if (!slot || !slot.start || slot.start === slot.end) return;
+  const dayData = state.weeklyContent[dateStr] && state.weeklyContent[dateStr][period];
+  const content  = dayData ? (dayData.content  || '') : '';
+  const homework = dayData ? (dayData.homework || '') : '';
+  google.script.run
+    .withSuccessHandler(function() {})
+    .withFailureHandler(function() {})
+    .updateEventDescription(JSON.stringify({ dateStr, startStr: slot.start, content, homework }));
+}
+
+function renderWeekRecord() {
+  const DOW_JP = ['日','月','火','水','木','金','土'];
+  const PERIODS = ['1','2','3','4','5','6'];
+
+  const weekDays = Array.from({length: 6}, (_, i) => {
+    const d = new Date(weekRecordMonday);
+    d.setDate(weekRecordMonday.getDate() + i);
+    return d;
+  });
+
+  const s = weekDays[0], e = weekDays[5];
+  const title = `${s.getFullYear()}年　${s.getMonth()+1}月${s.getDate()}日〜${e.getMonth()+1}月${e.getDate()}日`;
+
+  let html = `<div class="wr-nav">
+    <button onclick="moveWeekRecord(-1)">◀</button>
+    <span class="wr-nav-title">${title}</span>
+    <button onclick="moveWeekRecord(1)">▶</button>
+    <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;margin-left:4px" onclick="goToThisWeek()">今週</button>
+    <button class="btn btn-primary" style="font-size:12px;padding:5px 10px;margin-left:8px" onclick="printWeekRecord()">印刷</button>
+  </div>`;
+
+  html += '<div class="timetable-wrap"><table class="wr-table"><thead><tr>';
+  html += '<th class="wr-lbl-td">時限</th>';
+  for (const d of weekDays) {
+    const ds = formatDate(d);
+    const dow = d.getDay();
+    const isHol = isHoliday(ds);
+    const cls = isHol ? 'hol' : dow === 6 ? 'sat' : '';
+    html += `<th class="${cls}">${DOW_JP[dow]}<br><span style="font-size:11px;font-weight:400">${d.getMonth()+1}/${d.getDate()}</span></th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const period of PERIODS) {
+    // この時限に1日でも授業があるか確認
+    const hasAny = weekDays.some(d => getSubjectForDatePeriod(formatDate(d), period, d.getDay()) !== '');
+    if (!hasAny) continue; // 全曜日で授業なし → 行ごと省略
+
+    // 授業内容行
+    html += `<tr class="wr-content-row"><td class="wr-lbl-td" rowspan="2">`;
+    html += `<div class="wr-period-name">${period}時間目</div>`;
+    html += `<div class="wr-field-lbl" style="margin-top:3px">授業内容</div></td>`;
+    for (const d of weekDays) {
+      const ds = formatDate(d);
+      const dow = d.getDay();
+      const subj = getSubjectForDatePeriod(ds, period, dow);
+      const content = state.weeklyContent[ds] && state.weeklyContent[ds][period]
+        ? (state.weeklyContent[ds][period].content || '') : '';
+      if (!subj) {
+        // 授業なし → グレーで非活性表示
+        html += `<td class="wr-day-td" style="background:#f5f5f5;color:#ccc;text-align:center;font-size:11px">—</td>`;
+      } else {
+        html += `<td class="wr-day-td">`;
+        html += `<div class="wr-subj">${escHtml(subj)}</div>`;
+        html += `<textarea class="wr-textarea" placeholder="授業内容…" oninput="saveWeekContent('${ds}','${period}','content',this.value)" onblur="syncToCalendar('${ds}','${period}')">${escHtml(content)}</textarea>`;
+        html += `</td>`;
+      }
+    }
+    html += `</tr>`;
+
+    // 宿題行
+    html += `<tr class="wr-hw-row"><td class="wr-lbl-td" style="background:#fffbe6"><div class="wr-field-lbl" style="color:#a07000">宿題・課題</div></td>`;
+    for (const d of weekDays) {
+      const ds = formatDate(d);
+      const dow = d.getDay();
+      const subj = getSubjectForDatePeriod(ds, period, dow);
+      const homework = state.weeklyContent[ds] && state.weeklyContent[ds][period]
+        ? (state.weeklyContent[ds][period].homework || '') : '';
+      if (!subj) {
+        html += `<td class="wr-day-td" style="background:#f5f5f5"></td>`;
+      } else {
+        html += `<td class="wr-day-td"><textarea class="wr-hw-textarea" placeholder="宿題・課題…" oninput="saveWeekContent('${ds}','${period}','homework',this.value)" onblur="syncToCalendar('${ds}','${period}')">${escHtml(homework)}</textarea></td>`;
+      }
+    }
+    html += `</tr>`;
+  }
+
+  // 出欠・特記事項行
+  html += `<tr class="wr-note-row"><td class="wr-lbl-td" style="background:#f0fff4"><div class="wr-period-name" style="color:#1a6035">出欠</div><div class="wr-field-lbl">特記事項</div></td>`;
+  for (const d of weekDays) {
+    const ds = formatDate(d);
+    const note = state.weeklyContent[ds] ? (state.weeklyContent[ds].note || '') : '';
+    html += `<td class="wr-day-td"><textarea class="wr-note-textarea" placeholder="出欠・特記事項…" oninput="saveWeekContent('${ds}','note','note',this.value)">${escHtml(note)}</textarea></td>`;
+  }
+  html += `</tr>`;
+
+  html += '</tbody></table></div>';
+  document.getElementById('tab-record').innerHTML = html;
+}
+
+function saveWeekContent(dateStr, period, field, value) {
+  if (!state.weeklyContent[dateStr]) state.weeklyContent[dateStr] = {};
+  if (period === 'note') {
+    state.weeklyContent[dateStr].note = value;
+  } else {
+    if (!state.weeklyContent[dateStr][period]) state.weeklyContent[dateStr][period] = {};
+    state.weeklyContent[dateStr][period][field] = value;
+  }
+  saveState();
+}
+
+function moveWeekRecord(dir) {
+  weekRecordMonday = new Date(weekRecordMonday);
+  weekRecordMonday.setDate(weekRecordMonday.getDate() + dir * 7);
+  renderWeekRecord();
+}
+
+function goToThisWeek() {
+  weekRecordMonday = getMondayOfWeek(new Date());
+  renderWeekRecord();
+}
+
+function printWeekRecord() {
+  const DOW_JP = ['日','月','火','水','木','金','土'];
+  const PERIODS = ['1','2','3','4','5','6'];
+
+  const weekDays = Array.from({length: 6}, (_, i) => {
+    const d = new Date(weekRecordMonday);
+    d.setDate(weekRecordMonday.getDate() + i);
+    return d;
+  });
+  const s = weekDays[0], e = weekDays[5];
+  const weekLabel = `${s.getFullYear()}年　${s.getMonth()+1}月${s.getDate()}日（${DOW_JP[s.getDay()]}）〜${e.getMonth()+1}月${e.getDate()}日（${DOW_JP[e.getDay()]}）`;
+
+  // ヘッダー行
+  let headCols = '<th class="lbl-hd"></th>';
+  for (const d of weekDays) {
+    const ds = formatDate(d);
+    const dow = d.getDay();
+    const isHol = isHoliday(ds);
+    const color = dow === 6 ? '#1a4cc0' : isHol ? '#c00' : '#222';
+    headCols += `<th style="color:${color};text-align:center;font-size:8.5pt;padding:3px 2px;background:#eef">${DOW_JP[dow]}<br><span style="font-size:7pt;font-weight:400">${d.getMonth()+1}/${d.getDate()}</span></th>`;
+  }
+
+  // 時限行（授業内容＋宿題の2段）
+  let bodyRows = '';
+  for (const period of PERIODS) {
+    // 授業内容行
+    bodyRows += `<tr>`;
+    bodyRows += `<td class="lbl-td" rowspan="2"><div style="font-size:7pt;font-weight:700;color:#22c;line-height:1.2">${period}時間目</div><div style="font-size:6pt;color:#aaa;margin-top:3px">授業内容</div></td>`;
+    for (const d of weekDays) {
+      const ds = formatDate(d);
+      const dow = d.getDay();
+      const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
+      const cell = dayKey ? (state.timetable[dayKey] && state.timetable[dayKey][period]) : null;
+      const subj = cell && cell.subject ? cell.subject : '';
+      const content = (state.weeklyContent[ds] && state.weeklyContent[ds][period])
+        ? (state.weeklyContent[ds][period].content || '') : '';
+      bodyRows += `<td style="padding:3px 4px;vertical-align:top">`;
+      if (subj) bodyRows += `<div style="font-size:6.5pt;color:#888;margin-bottom:1px">${escHtml(subj)}</div>`;
+      bodyRows += `<div style="font-size:8pt;line-height:1.5;white-space:pre-wrap">${escHtml(content)}</div>`;
+      bodyRows += `</td>`;
+    }
+    bodyRows += `</tr>`;
+    // 宿題行
+    bodyRows += `<tr style="background:#fffbe6">`;
+    bodyRows += `<td style="font-size:6pt;color:#a07000;text-align:center;background:#fffbe6;padding:2px">宿題</td>`;
+    for (const d of weekDays) {
+      const ds = formatDate(d);
+      const hw = (state.weeklyContent[ds] && state.weeklyContent[ds][period])
+        ? (state.weeklyContent[ds][period].homework || '') : '';
+      bodyRows += `<td style="padding:2px 4px;background:#fffbe6;font-size:7.5pt;line-height:1.4;white-space:pre-wrap">${escHtml(hw)}</td>`;
+    }
+    bodyRows += `</tr>`;
+  }
+
+  // 出欠・特記事項行
+  bodyRows += `<tr style="background:#f0fff4">`;
+  bodyRows += `<td class="lbl-td" style="background:#f0fff4"><div style="font-size:7pt;font-weight:700;color:#1a6035;line-height:1.2">出欠<br>特記</div></td>`;
+  for (const d of weekDays) {
+    const ds = formatDate(d);
+    const note = (state.weeklyContent[ds] && state.weeklyContent[ds].note) ? state.weeklyContent[ds].note : '';
+    bodyRows += `<td style="padding:3px 4px;background:#f0fff4;font-size:8pt;line-height:1.5;white-space:pre-wrap">${escHtml(note)}</td>`;
+  }
+  bodyRows += `</tr>`;
+
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>週記録</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Hiragino Sans','Meiryo',sans-serif}
+.print-btn{padding:6px 18px;background:#4361ee;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin:8px}
+.page{padding:10mm 10mm 8mm}
+.pg-title{text-align:center;font-size:13pt;font-weight:700;letter-spacing:2px;margin-bottom:1mm}
+.pg-week{text-align:center;font-size:8.5pt;color:#444;margin-bottom:4mm}
+table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8pt}
+table th,table td{border:1px solid #999;vertical-align:top;padding:0}
+.lbl-hd{width:22px;background:#eef}
+.lbl-td{width:22px;background:#eef;text-align:center;vertical-align:middle;padding:2px 1px}
+@page{size:A4 portrait;margin:0}
+@media screen{body{background:#ccc;padding:10mm}.page{background:#fff;margin:0 auto;max-width:210mm;box-shadow:0 2px 8px rgba(0,0,0,.3)}}
+@media print{.print-btn{display:none}-webkit-print-color-adjust:exact;print-color-adjust:exact}
+</style></head><body>
+<div style="text-align:center"><button class="print-btn" onclick="window.print()">印刷する（A4縦）</button></div>
+<div class="page">
+  <div class="pg-title">週　記　録</div>
+  <div class="pg-week">${weekLabel}</div>
+  <table>
+    <thead><tr>${headCols}</tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table>
+</div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+// ─────────────────────────
+
+function renderPrintTab() {
+  const c0name = state.classes[0].name;
+  const c1name = state.classes[1].name;
+  let html = '';
+
+  // 月間時間割
+  html += `<div class="subject-manager">
+    <h3>月間時間割</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:12px">カレンダーで設定した日程をもとにA4横・2カラムで出力します</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:13px">対象月：</label>
+      <select id="printYear" style="padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">`;
+  const thisYear = new Date().getFullYear();
+  for (let y = thisYear - 1; y <= thisYear + 2; y++) {
+    html += `<option value="${y}" ${y === calYear ? 'selected' : ''}>${y}年</option>`;
+  }
+  html += `</select>
+      <select id="printMonth" style="padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">`;
+  for (let m = 1; m <= 12; m++) {
+    html += `<option value="${m}" ${m === calMonth ? 'selected' : ''}>${m}月</option>`;
+  }
+  html += `</select>
+      <button class="btn btn-primary" onclick="printMonthlyFromTab(0)">${c0name}を印刷</button>
+      <button class="btn btn-primary" onclick="printMonthlyFromTab(1)">${c1name}を印刷</button>
+    </div>
+  </div>`;
+
+  // 週案
+  html += `<div class="subject-manager" style="margin-top:12px">
+    <h3>週案（自分）</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:12px">授業カレンダーから読み取ってA4横の週案形式で出力します</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:13px">週の開始日（月曜日）：</label>
+      <input type="date" id="weekPlanStart" style="padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+      <button class="btn btn-primary" onclick="loadWeekPlan()">週案を生成</button>
+    </div>
+    <div id="weekPlanStatus" style="margin-top:8px;font-size:13px;color:#888"></div>
+  </div>`;
+
+  // 今週の月曜日をデフォルトにセット
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  document.getElementById('tab-print').innerHTML = html;
+  const startEl = document.getElementById('weekPlanStart');
+  if (startEl) startEl.value = formatDate(monday);
+}
+
+function loadWeekPlan() {
+  const startEl = document.getElementById('weekPlanStart');
+  if (!startEl || !startEl.value) { showToast('週の開始日を選んでください'); return; }
+  const statusEl = document.getElementById('weekPlanStatus');
+  statusEl.textContent = '読み込み中...';
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (!result.success) { statusEl.textContent = 'エラー：' + result.error; return; }
+      statusEl.textContent = result.events.length + '件のイベントを取得しました';
+      printWeekPlan(startEl.value, result.events);
+    })
+    .withFailureHandler(function(err) { statusEl.textContent = 'エラー：' + (err.message || err); })
+    .getWeekEvents(startEl.value);
+}
+
+function printWeekPlan(startDateStr, events) {
+  const DOW_JP = ['日','月','火','水','木','金','土'];
+  const startDate = new Date(startDateStr + 'T00:00:00');
+
+  // 月〜日の7日分（月曜起点）
+  const days = Array.from({length: 7}, (_, i) => {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    return d;
+  });
+  const weekDays = days.slice(0, 6); // 月〜土
+  const sunday   = days[6];
+
+  // イベントを日付×時刻でグループ化・ソート
+  const byDate = {};
+  for (const ev of events) {
+    if (!byDate[ev.dateStr]) byDate[ev.dateStr] = [];
+    byDate[ev.dateStr].push(ev);
+  }
+  for (const k of Object.keys(byDate)) {
+    byDate[k].sort((a, b) => a.startStr.localeCompare(b.startStr));
+  }
+
+  // 教科別集計
+  const subjectCount = {};
+  for (const ev of events) {
+    const subj = ev.title.replace(/（[^）]*）/, '').trim();
+    if (subj) subjectCount[subj] = (subjectCount[subj] || 0) + 1;
+  }
+
+  const PERIOD_ROWS = [
+    { key: '1', label: '第1時' },
+    { key: '2', label: '第2時' },
+    { key: '3', label: '第3時' },
+    { key: '4', label: '第4時' },
+    { key: 'lunch', label: '昼休み', special: true },
+    { key: '5', label: '第5時' },
+    { key: '6', label: '第6時' },
+  ];
+
+  // ヘッダー行（月〜土）
+  const dayHeaders = weekDays.map(d => {
+    const ds = formatDate(d);
+    const dow = d.getDay();
+    const isHol = isHoliday(ds);
+    const color = dow === 6 ? '#1a4cc0' : isHol ? '#c00' : '#222';
+    return `<th class="day-hd" style="color:${color}">${DOW_JP[dow]}<br><span class="day-date">${d.getMonth()+1}/${d.getDate()}</span></th>`;
+  }).join('');
+
+  // 行数計算：出退×2 + 6時限×2 + 昼休み×1 + 備考×1 = 16
+  const regularCount = PERIOD_ROWS.filter(p => !p.special).length;
+  const specialCount = PERIOD_ROWS.filter(p => p.special).length;
+  const totalRows = 2 + regularCount * 2 + specialCount + 1;
+
+  // 出退勤行
+  const shutsuRow = `<tr class="shutsu-row">` +
+    `<td class="lbl-td" rowspan="2"><div class="lbl-vt">出退勤</div></td>` +
+    weekDays.map(() => `<td class="shutsu-td"><div class="shutsu-sub">出</div></td>`).join('') +
+    `<td class="sum-td" rowspan="${totalRows}">` +
+    `<div class="sum-title">教科別<br>時数集計</div>` +
+    Object.entries(subjectCount).map(([s,c]) =>
+      `<div class="sum-entry"><span class="sum-s">${s}</span><span class="sum-c">${c}</span></div>`
+    ).join('') +
+    `</td></tr>`;
+  const taiRow = `<tr class="tai-row">` +
+    weekDays.map(() => `<td class="shutsu-td"><div class="shutsu-sub">退</div></td>`).join('') +
+    `</tr>`;
+
+  // 時限行
+  let periodHtml = '';
+  let pi = 0;
+  for (const pr of PERIOD_ROWS) {
+    if (pr.special) {
+      periodHtml += `<tr class="lunch-row">` +
+        `<td class="lbl-td" style="font-size:7pt;text-align:center">${pr.label}</td>` +
+        weekDays.map(() => `<td class="lunch-td"></td>`).join('') +
+        `</tr>`;
+      continue;
+    }
+    // 予定行
+    periodHtml += `<tr class="yotei-row">` +
+      `<td class="lbl-td yotei-lbl"><div class="lbl-period">${pr.label}</div><div class="lbl-sub">予定</div></td>` +
+      weekDays.map(d => {
+        const ds = formatDate(d);
+        const ev = byDate[ds] && byDate[ds][pi];
+        if (!ev) return `<td class="subj-td empty-td"></td>`;
+        const subj = ev.title.replace(/（[^）]*）/, '').trim();
+        const loc  = ev.location || '';
+        return `<td class="subj-td"><div class="subj-n">${subj}</div>${loc ? `<div class="subj-l">${loc}</div>` : ''}</td>`;
+      }).join('') +
+      `</tr>`;
+    // 実施行
+    periodHtml += `<tr class="jissi-row">` +
+      `<td class="lbl-td jissi-lbl"><div class="lbl-sub">実施</div></td>` +
+      weekDays.map(() => `<td class="jissi-td"></td>`).join('') +
+      `</tr>`;
+    pi++;
+  }
+
+  // 備考行
+  const bikoRow = `<tr class="biko-row">` +
+    `<td class="lbl-td biko-lbl"><div class="lbl-vt">備考</div></td>` +
+    weekDays.map(() => `<td class="biko-td"></td>`).join('') +
+    `</tr>`;
+
+  // 日曜行
+  const sunDs = formatDate(sunday);
+  const sunEvs = byDate[sunDs] || [];
+  const sunRow = `<div class="sun-bar">` +
+    `<span class="sun-dow">日（${sunday.getMonth()+1}/${sunday.getDate()}）</span>` +
+    (sunEvs.length
+      ? sunEvs.map(e => `<span class="sun-ev">${e.title.replace(/（[^）]*）/,'').trim()}</span>`).join('　')
+      : '<span style="color:#aaa">特記なし</span>') +
+    `</div>`;
+
+  const s = weekDays[0], e = weekDays[5];
+  const weekLabel = `${s.getFullYear()}年　${s.getMonth()+1}月${s.getDate()}日（${DOW_JP[s.getDay()]}）〜${e.getMonth()+1}月${e.getDate()}日（${DOW_JP[e.getDay()]}）`;
+
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>週案</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Hiragino Sans','Meiryo',sans-serif;background:#fff}
+.print-btn{padding:6px 18px;background:#4361ee;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin:8px}
+.page{width:194mm;padding:8mm}
+.pg-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:3mm}
+.pg-title{font-size:12pt;font-weight:700;letter-spacing:3px;text-align:center;flex:1}
+.pg-week{font-size:7.5pt;color:#444;text-align:center;margin-top:1mm}
+.stamps{display:flex;gap:2mm;flex-shrink:0}
+.stamp-box{width:11mm;height:11mm;border:1px solid #888;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:1mm}
+.stamp-lbl{font-size:5pt;color:#666}
+table.wp{width:100%;border-collapse:collapse;table-layout:fixed;font-size:7.5pt}
+table.wp th,table.wp td{border:1px solid #888;vertical-align:middle;padding:0}
+.lbl-hd{width:18px;background:#eef}
+.day-hd{text-align:center;font-size:8pt;font-weight:700;padding:2px 1px;background:#eef;line-height:1.3}
+.day-date{font-size:6pt;font-weight:400}
+.sum-hd{width:40px;text-align:center;font-size:6.5pt;background:#eef;padding:2px}
+.lbl-td{width:18px;background:#eef;text-align:center;padding:1px}
+.lbl-period{font-size:7pt;font-weight:700;line-height:1.2;color:#22c}
+.lbl-sub{font-size:5.5pt;color:#888;line-height:1}
+.lbl-vt{font-size:6pt;writing-mode:vertical-rl;line-height:1}
+.shutsu-row td,.tai-row td{height:13px}
+.shutsu-td{padding:0 2px}
+.shutsu-sub{font-size:6pt;color:#666;text-align:right;padding-right:2px}
+.yotei-lbl,.yotei-row td{height:23px}
+.jissi-lbl,.jissi-row td{height:14px;background:#fafafa}
+.subj-td{padding:2px 2px;vertical-align:middle}
+.subj-n{font-size:7.5pt;font-weight:700;line-height:1.3}
+.subj-l{font-size:6pt;color:#555}
+.empty-td{background:#f9f9f9}
+.jissi-td{border:1px solid #ccc}
+.lunch-row td{height:12px;background:#fffbe6}
+.lunch-td{border:1px solid #ccc}
+.biko-lbl,.biko-row td{height:26px;background:#fffdf0}
+.biko-lbl{writing-mode:vertical-rl;font-size:6pt}
+.biko-td{border:1px solid #bbb}
+.sum-td{width:40px;border:1px solid #888;background:#f8f9ff;vertical-align:top;padding:2px}
+.sum-title{font-weight:700;font-size:6pt;text-align:center;border-bottom:1px solid #aaa;padding-bottom:2px;margin-bottom:2px;line-height:1.4}
+.sum-entry{display:flex;justify-content:space-between;gap:1px;border-bottom:1px dotted #ccc;padding:1px 0}
+.sum-s{font-size:5.5pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:22px}
+.sum-c{font-size:7pt;font-weight:700;color:#22c;white-space:nowrap}
+.sun-bar{margin-top:3mm;border:1px solid #888;padding:4px 8px;background:#fff8f8;font-size:8pt}
+.sun-dow{font-weight:700;color:#c00;margin-right:8px}
+.sun-ev{display:inline-block;margin-right:6px;font-weight:700}
+@page{size:A4 portrait;margin:0}
+@media screen{
+  body{background:#ccc;padding:10mm}
+  .page{background:#fff;margin:0 auto;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+}
+@media print{
+  body{background:#fff;padding:0}
+  .print-btn{display:none}
+  .page{width:210mm;padding:8mm}
+  -webkit-print-color-adjust:exact;print-color-adjust:exact
+}
+</style></head><body>
+<div style="text-align:center;margin:6px"><button class="print-btn" onclick="window.print()">印刷する（A4縦）</button></div>
+<div class="page">
+  <div class="pg-top">
+    <div style="width:37mm"></div>
+    <div><div class="pg-title">週　案</div><div class="pg-week">${weekLabel}</div></div>
+    <div class="stamps">
+      <div class="stamp-box"><div class="stamp-lbl">校長</div></div>
+      <div class="stamp-box"><div class="stamp-lbl">教頭</div></div>
+      <div class="stamp-box"><div class="stamp-lbl">本人</div></div>
+    </div>
+  </div>
+  <table class="wp">
+    <thead><tr>
+      <th class="lbl-hd"></th>
+      ${dayHeaders}
+      <th class="sum-hd">教科別<br>時数集計</th>
+    </tr></thead>
+    <tbody>
+      ${shutsuRow}${taiRow}
+      ${periodHtml}
+      ${bikoRow}
+    </tbody>
+  </table>
+  ${sunRow}
+</div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
+function printMonthlyFromTab(classIdx) {
+  const y = parseInt(document.getElementById('printYear').value);
+  const m = parseInt(document.getElementById('printMonth').value);
+  // 一時的にcalYear/calMonthを切り替えて印刷、その後戻す
+  const prevYear = calYear, prevMonth = calMonth;
+  calYear = y; calMonth = m;
+  printMonthly(classIdx);
+  calYear = prevYear; calMonth = prevMonth;
+}
+
+function printMonthly(classIdx) {
+  const DOW_NAMES = ['日','月','火','水','木','金','土'];
+  const DOW_NAMES_SHORT = ['日','月','火','水','木','金','土'];
+  const lastDayNum = new Date(calYear, calMonth, 0).getDate();
+  const classTT = state.classes[classIdx].timetable;
+  const className = state.classes[classIdx].name;
+  const ALL_PRINT_PERIODS = ['1','2','3','4','5'];
+
+  // 祝日名マップ（同じHOLIDAYSセットを参照して名前を付ける用）
+  const HOLIDAY_NAMES = {
+    '01-01':'元日','01-13':'成人の日','01-12':'成人の日','01-11':'成人の日',
+    '02-11':'建国記念の日','02-12':'振替休日','02-23':'天皇誕生日','02-24':'振替休日',
+    '03-20':'春分の日','03-21':'春分の日',
+    '04-29':'昭和の日','04-30':'振替休日',
+    '05-03':'憲法記念日','05-04':'みどりの日','05-05':'こどもの日','05-06':'振替休日',
+    '07-15':'海の日','07-21':'海の日','07-20':'海の日','07-19':'海の日',
+    '08-11':'山の日','08-12':'振替休日',
+    '09-15':'敬老の日','09-16':'敬老の日','09-21':'敬老の日','09-20':'敬老の日',
+    '09-22':'秋分の日','09-23':'秋分の日',
+    '10-13':'スポーツの日','10-14':'スポーツの日','10-12':'スポーツの日','10-11':'スポーツの日',
+    '11-03':'文化の日','11-04':'振替休日','11-23':'勤労感謝の日','11-24':'振替休日',
+  };
+
+  // 教科→色マップ
+  const SUBJECT_COLORS = {
+    '国語':  '#e8d5f5', '作文': '#d5f0d5', '書写': '#e0d5f5',
+    '算数':  '#d5e8ff', '数学': '#d5e8ff',
+    '理科':  '#d5f5e8', '社会': '#fff0cc',
+    '英語':  '#ffd5d5',
+    '音楽':  '#ffe8d5', '図工': '#ffd5e8', '美術': '#ffd5e8',
+    '体育':  '#d5f0d5', '家庭': '#ffecd5', '技術': '#e0f0d5',
+    '道徳':  '#f5f5d5', '総合': '#e5f5ff', '学活': '#f0e5ff',
+    '自習':  '#f0f0f0',
+  };
+  function subjectColor(s) {
+    if (!s) return null;
+    if (SUBJECT_COLORS[s]) return SUBJECT_COLORS[s];
+    // 部分一致フォールバック
+    for (const k of Object.keys(SUBJECT_COLORS)) {
+      if (s.includes(k)) return SUBJECT_COLORS[k];
+    }
+    return '#e8f4ff';
+  }
+
+  // 全日分のデータを構築
+  const allDays = [];
+  for (let d = 1; d <= lastDayNum; d++) {
+    const date = new Date(calYear, calMonth - 1, d);
+    const dow = date.getDay();
+    const dateStr = formatDate(date);
+    const mmdd = dateStr.slice(5); // MM-DD
+    const config = state.calendarConfig[dateStr];
+    const presetId = config && config.presetId;
+    const preset = presetId ? state.presets.find(p => p.id === presetId) : null;
+    const periodMap = (config && config.periodMap) || {};
+    const holiday = isHoliday(dateStr);
+    const holidayName = holiday ? (HOLIDAY_NAMES[mmdd] || '祝日') : null;
+    allDays.push({ d, dow, dateStr, preset, periodMap, holiday, holidayName });
+  }
+
+  // 1行のHTML生成
+  function buildRow(dayObj) {
+    const { d, dow, preset, periodMap, holiday, holidayName } = dayObj;
+    const dayKey = ['','月','火','水','木','金','土'][dow];
+    const isSun = dow === 0;
+    const isSat = dow === 6;
+    const isOff = isSun || (isSat && !preset) || (holiday && !preset);
+    const dateColor = isSun || (holiday && !preset) ? '#cc0000' : isSat ? '#2255cc' : holiday ? '#cc0000' : '#222';
+    const rowBg = isOff ? '#f0f0f0' : (isSat || holiday) && preset ? '#fffbe6' : 'white';
+    const textAlpha = isOff ? '0.45' : '1';
+    const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PRINT_PERIODS) : [];
+    const mapNote = Object.keys(periodMap).length > 0 ? '⚡' : '';
+
+    let row = `<tr class="day-row ${isOff?'off-day':''}" style="background:${rowBg}">`;
+    row += `<td class="date-cell" style="color:${dateColor}">${d}<span class="dow-label">${DOW_NAMES_SHORT[dow]}</span>${mapNote}</td>`;
+
+    if (isOff && holidayName) {
+      row += `<td colspan="5" class="holiday-cell">${holidayName}</td>`;
+    } else if (!preset && !isOff) {
+      row += `<td colspan="5" class="no-preset-cell">−</td>`;
+    } else if (isOff) {
+      row += `<td colspan="5" class="off-cell"></td>`;
+    } else {
+      for (const period of ALL_PRINT_PERIODS) {
+        if (!visiblePeriods.includes(period)) {
+          row += `<td class="subject-cell empty-cell"><span class="empty-mark">—</span></td>`;
+          continue;
+        }
+        const mapVal = periodMap[period];
+        const cell = (mapVal && typeof mapVal === 'object')
+          ? mapVal
+          : (classTT[dayKey] && classTT[dayKey][mapVal || period]);
+        const subject = cell ? cell.subject : '';
+        const room = cell ? cell.room : '';
+        const bg = subject ? subjectColor(subject) : null;
+        const bgStyle = bg ? `background:${bg};` : '';
+        const subjectHtml = subject
+          ? `<span class="subj">${subject}</span>${room ? `<span class="room">${room}</span>` : ''}`
+          : `<span class="empty-mark">—</span>`;
+        row += `<td class="subject-cell" style="${bgStyle}">${subjectHtml}</td>`;
+      }
+    }
+    row += '</tr>';
+    return row;
+  }
+
+  // 週の区切り行
+  const weekGap = `<tr class="week-gap"><td colspan="6"></td></tr>`;
+
+  // 左（1〜16日）・右（17〜末日）カラムのHTML生成
+  function buildColumn(days) {
+    let html = '<table class="tt-table"><thead><tr>';
+    html += '<th class="th-date">日</th>';
+    for (const p of ALL_PRINT_PERIODS) html += `<th class="th-period">${p}</th>`;
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < days.length; i++) {
+      const day = days[i];
+      // 週の区切り：前の日が日曜で今日が月曜（かつ最初の行でない）
+      if (i > 0 && day.dow === 1) html += weekGap;
+      html += buildRow(day);
+    }
+    html += '</tbody></table>';
+    return html;
+  }
+
+  const leftDays  = allDays.filter(d => d.d <= 16);
+  const rightDays = allDays.filter(d => d.d >= 17);
+
+  const leftHtml  = buildColumn(leftDays);
+  const rightHtml = buildColumn(rightDays);
+
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>${calYear}年${calMonth}月 ${className} 時間割</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; margin: 0; padding: 12px 16px; background: white; }
+h1.print-title { text-align: center; font-size: 14pt; font-weight: 700; margin: 0 0 10px; }
+.print-btn { display: block; margin: 0 auto 12px; padding: 6px 20px; background: #4361ee; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tt-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tt-table thead tr { background: #4361ee; color: white; }
+.th-date { width: 36px; font-size: 8pt; padding: 3px 2px; text-align: center; }
+.th-period { font-size: 8pt; padding: 3px 2px; text-align: center; }
+.day-row td { border: 1px solid #ddd; vertical-align: middle; height: 22px; }
+.date-cell { text-align: center; font-size: 9pt; font-weight: 600; padding: 2px 1px; white-space: nowrap; }
+.dow-label { font-size: 7.5pt; margin-left: 2px; }
+.subject-cell { text-align: center; padding: 1px 2px; font-size: 8.5pt; }
+.subj { display: block; font-weight: 600; font-size: 8.5pt; line-height: 1.2; }
+.room { display: block; font-size: 6.5pt; color: #555; line-height: 1.1; }
+.empty-mark { color: #bbb; font-size: 8pt; }
+.off-day td { color: rgba(0,0,0,0.35) !important; }
+.holiday-cell { text-align: center; font-size: 7.5pt; color: #cc0000 !important; padding: 2px; }
+.no-preset-cell { text-align: center; color: #bbb; font-size: 8pt; }
+.off-cell { }
+.week-gap { height: 6px; }
+.week-gap td { border: none; background: transparent; padding: 0; }
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  body { padding: 0; }
+  .print-btn { display: none; }
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  .tt-table thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .subject-cell { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head><body>
+<button class="print-btn" onclick="window.print()">印刷する</button>
+<h1 class="print-title">${calYear}年${calMonth}月　${className}　時間割</h1>
+<div class="two-col">
+  <div>${leftHtml}</div>
+  <div>${rightHtml}</div>
+</div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
+function addSubject() {
+  const input = document.getElementById('newSubjectInput');
+  const name = input.value.trim();
+  if (!name || state.subjects.includes(name)) return;
+  state.subjects.push(name);
+  input.value = '';
+  saveState();
+  renderPresets();
+}
+function removeSubject(index) {
+  state.subjects.splice(index, 1);
+  saveState();
+  renderPresets();
+}
+
+init();
+</script>
+</body>
+</html>

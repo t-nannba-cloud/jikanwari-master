@@ -38,7 +38,7 @@ export function TimetableView({ timetable, activePreset, onUpdate }: Props) {
             </tr>
           </thead>
           <tbody>
-            {PERIODS.map((period) => {
+            {(activePreset?.visiblePeriods ?? PERIODS).map((period) => {
               const slot = activePreset?.slots[period]
               return (
                 <tr key={period}>
