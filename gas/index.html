@@ -1068,13 +1068,13 @@ function printWeekPlan(startDateStr, events) {
   }
 
   const PERIOD_ROWS = [
+    { key: 'memo_pre',  label: 'メモ', special: 'memo' },
     { key: '1', label: '第1時' },
+    { key: 'kyushoku', label: '給食', special: 'kyushoku' },
+    { key: 'memo_mid',  label: 'メモ', special: 'memo' },
     { key: '2', label: '第2時' },
     { key: '3', label: '第3時' },
     { key: '4', label: '第4時' },
-    { key: 'lunch', label: '昼休み', special: true },
-    { key: '5', label: '第5時' },
-    { key: '6', label: '第6時' },
   ];
 
   // ヘッダー行（月〜土）
@@ -1086,7 +1086,7 @@ function printWeekPlan(startDateStr, events) {
     return `<th class="day-hd" style="color:${color}">${DOW_JP[dow]}<br><span class="day-date">${d.getMonth()+1}/${d.getDate()}</span></th>`;
   }).join('');
 
-  // 行数計算：出退×2 + 6時限×2 + 昼休み×1 + 備考×1 = 16
+  // 行数計算：出退×2 + 4時限×2 + (メモ×2+給食×1)×1 + 備考×1 = 14
   const regularCount = PERIOD_ROWS.filter(p => !p.special).length;
   const specialCount = PERIOD_ROWS.filter(p => p.special).length;
   const totalRows = 2 + regularCount * 2 + specialCount + 1;
@@ -1109,10 +1109,17 @@ function printWeekPlan(startDateStr, events) {
   let periodHtml = '';
   let pi = 0;
   for (const pr of PERIOD_ROWS) {
-    if (pr.special) {
-      periodHtml += `<tr class="lunch-row">` +
-        `<td class="lbl-td" style="font-size:7pt;text-align:center">${pr.label}</td>` +
-        weekDays.map(() => `<td class="lunch-td"></td>`).join('') +
+    if (pr.special === 'kyushoku') {
+      periodHtml += `<tr class="kyushoku-row">` +
+        `<td class="lbl-td" style="font-size:7pt;text-align:center;writing-mode:vertical-rl">給食</td>` +
+        weekDays.map(() => `<td class="kyushoku-td"></td>`).join('') +
+        `</tr>`;
+      continue;
+    }
+    if (pr.special === 'memo') {
+      periodHtml += `<tr class="memo-row">` +
+        `<td class="lbl-td" style="font-size:7pt;text-align:center;writing-mode:vertical-rl">メモ</td>` +
+        weekDays.map(() => `<td class="memo-td"></td>`).join('') +
         `</tr>`;
       continue;
     }
@@ -1188,8 +1195,10 @@ table.wp th,table.wp td{border:1px solid #888;vertical-align:middle;padding:0}
 .subj-l{font-size:6pt;color:#555}
 .empty-td{background:#f9f9f9}
 .jissi-td{border:1px solid #ccc}
-.lunch-row td{height:12px;background:#fffbe6}
-.lunch-td{border:1px solid #ccc}
+.kyushoku-row td{height:18px;background:#fff8e0}
+.kyushoku-td{border:1px solid #ccc}
+.memo-row td{height:22px;background:#f7f7ff}
+.memo-td{border:1px solid #ccc}
 .biko-lbl,.biko-row td{height:26px;background:#fffdf0}
 .biko-lbl{writing-mode:vertical-rl;font-size:6pt}
 .biko-td{border:1px solid #bbb}
