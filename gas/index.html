@@ -599,6 +599,12 @@ function openPeriodMapModal(dateStr) {
       const optLabel = optSlot ? optSlot.label : opt + '限';
       html += `<option value="${opt}" ${currentSel===opt?'selected':''}>${optLabel}の内容</option>`;
     }
+    // プリセットに含まれない通常授業（1〜6限）を選択肢として追加
+    const NORMAL_PERIODS = ['1','2','3','4','5','6'];
+    for (const np of NORMAL_PERIODS) {
+      if (visiblePeriods.includes(np)) continue;
+      html += `<option value="${np}" ${currentSel===np?'selected':''}>${np}時間目の授業</option>`;
+    }
     html += `<option value="__custom__" ${isCustom?'selected':''}>記述式</option>
         </select>
       </div>
@@ -609,36 +615,6 @@ function openPeriodMapModal(dateStr) {
     </div>`;
   }
 
-  // プリセットに含まれない数値時限（1〜6）への授業追加欄
-  const NUMERIC_PERIODS = ['1','2','3','4','5','6'];
-  const extraPeriods = NUMERIC_PERIODS.filter(p => !visiblePeriods.includes(p));
-  if (extraPeriods.length > 0) {
-    html += `<div style="border-top:1px solid #e0e0e0;margin:12px 0 10px;padding-top:10px">
-      <div style="font-size:12px;font-weight:700;color:#4361ee;margin-bottom:8px">📚 この日の授業を追加</div>`;
-    const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
-    for (const period of extraPeriods) {
-      const mapVal = periodMap[period];
-      const hasExtra = mapVal && typeof mapVal === 'object' && mapVal.subject;
-      const extraSubject = hasExtra ? (mapVal.subject || '') : '';
-      const extraRoom    = hasExtra ? (mapVal.room    || '') : '';
-      // 自分の時間割から教科名をプリセット
-      const ttCell = dayKey ? (state.timetable[dayKey] && state.timetable[dayKey][period]) : null;
-      const ttSubject = ttCell && ttCell.subject ? ttCell.subject : '';
-      const displaySubject = extraSubject || ttSubject;
-      html += `<div style="margin-bottom:8px">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-          <input type="checkbox" id="pmap_extra_chk_${period}" ${hasExtra?'checked':''} onchange="toggleExtraPeriod('${period}')">
-          <span style="font-weight:600">${period}時間目</span>
-        </label>
-        <div id="pmap_extra_inputs_${period}" style="margin-top:5px;margin-left:26px;display:${hasExtra?'flex':'none'};gap:6px">
-          <input type="text" id="pmap_extra_subject_${period}" placeholder="教科名" value="${escHtml(displaySubject)}" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-          <input type="text" id="pmap_extra_room_${period}" placeholder="場所" value="${escHtml(extraRoom)}" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-        </div>
-      </div>`;
-    }
-    html += `</div>`;
-  }
-
   document.getElementById('periodMapBody').innerHTML = html;
   document.getElementById('periodMapModal').style.display = 'flex';
 }
@@ -646,11 +622,6 @@ function onPeriodMapChange(period) {
   const sel = document.getElementById('pmap_' + period);
   const customDiv = document.getElementById('pmap_custom_' + period);
   if (customDiv) customDiv.style.display = sel.value === '__custom__' ? 'flex' : 'none';
-}
-function toggleExtraPeriod(period) {
-  const chk = document.getElementById('pmap_extra_chk_' + period);
-  const inputs = document.getElementById('pmap_extra_inputs_' + period);
-  if (inputs) inputs.style.display = chk && chk.checked ? 'flex' : 'none';
 }
 function closePeriodMapModal() {
   document.getElementById('periodMapModal').style.display = 'none';
@@ -675,20 +646,6 @@ function savePeriodMap() {
       hasChange = true;
     } else if (el.value !== period) {
       periodMap[period] = el.value;
-      hasChange = true;
-    }
-  }
-
-  // 追加時限（式などプリセット外の1〜6限）を収集
-  const NUMERIC_PERIODS = ['1','2','3','4','5','6'];
-  const extraPeriods = NUMERIC_PERIODS.filter(p => !visiblePeriods.includes(p));
-  for (const period of extraPeriods) {
-    const chk = document.getElementById('pmap_extra_chk_' + period);
-    if (!chk || !chk.checked) continue;
-    const subject = (document.getElementById('pmap_extra_subject_' + period) || {}).value || '';
-    const room    = (document.getElementById('pmap_extra_room_'    + period) || {}).value || '';
-    if (subject.trim()) {
-      periodMap[period] = { subject: subject.trim(), room: room.trim(), extraPeriod: true };
       hasChange = true;
     }
   }
@@ -787,16 +744,11 @@ function getSubjectForDatePeriod(dateStr, period, dow) {
 }
 
 // 日付・時限からプリセットのスロット（開始時刻など）を返す
-// 式プリセットなどにそのperiodがない場合は通常プリセットにフォールバック
 function getPeriodSlotForDate(dateStr, period) {
   const config = state.calendarConfig[dateStr];
   const presetId = config && config.presetId ? config.presetId : state.activePresetId;
   const preset = state.presets.find(p => p.id === presetId) || getActivePreset();
-  const slot = preset && preset.slots ? preset.slots[period] : null;
-  if (slot && slot.start && slot.start !== slot.end) return slot;
-  // extraPeriod の場合は通常プリセットで時刻を補完
-  const normalPreset = state.presets.find(p => p.id === 'normal') || getActivePreset();
-  return normalPreset && normalPreset.slots ? normalPreset.slots[period] : null;
+  return preset && preset.slots ? preset.slots[period] : null;
 }
 
 // 日付・時限のカレンダーイベントのメモを更新
