@@ -1068,13 +1068,14 @@ function printWeekPlan(startDateStr, events) {
   }
 
   const PERIOD_ROWS = [
-    { key: 'memo_pre',  label: 'メモ', special: 'memo' },
+    { key: 'blank_pre',  special: 'blank' },
     { key: '1', label: '第1時' },
-    { key: 'kyushoku', label: '給食', special: 'kyushoku' },
-    { key: 'memo_mid',  label: 'メモ', special: 'memo' },
+    { key: 'kyushoku',   special: 'kyushoku' },
+    { key: 'blank_mid',  special: 'blank' },
     { key: '2', label: '第2時' },
     { key: '3', label: '第3時' },
     { key: '4', label: '第4時' },
+    { key: '5', label: '第5時' },
   ];
 
   // ヘッダー行（月〜土）
@@ -1116,10 +1117,10 @@ function printWeekPlan(startDateStr, events) {
         `</tr>`;
       continue;
     }
-    if (pr.special === 'memo') {
-      periodHtml += `<tr class="memo-row">` +
-        `<td class="lbl-td" style="font-size:7pt;text-align:center;writing-mode:vertical-rl">メモ</td>` +
-        weekDays.map(() => `<td class="memo-td"></td>`).join('') +
+    if (pr.special === 'blank') {
+      periodHtml += `<tr class="blank-row">` +
+        `<td class="lbl-td"></td>` +
+        weekDays.map(() => `<td class="blank-td"></td>`).join('') +
         `</tr>`;
       continue;
     }
@@ -1185,21 +1186,21 @@ table.wp th,table.wp td{border:1px solid #888;vertical-align:middle;padding:0}
 .lbl-period{font-size:7pt;font-weight:700;line-height:1.2;color:#22c}
 .lbl-sub{font-size:5.5pt;color:#888;line-height:1}
 .lbl-vt{font-size:6pt;writing-mode:vertical-rl;line-height:1}
-.shutsu-row td,.tai-row td{height:13px}
+.shutsu-row td,.tai-row td{height:9mm}
 .shutsu-td{padding:0 2px}
 .shutsu-sub{font-size:6pt;color:#666;text-align:right;padding-right:2px}
-.yotei-lbl,.yotei-row td{height:23px}
-.jissi-lbl,.jissi-row td{height:14px;background:#fafafa}
-.subj-td{padding:2px 2px;vertical-align:middle}
-.subj-n{font-size:7.5pt;font-weight:700;line-height:1.3}
-.subj-l{font-size:6pt;color:#555}
+.yotei-lbl,.yotei-row td{height:18mm}
+.jissi-lbl,.jissi-row td{height:10mm;background:#fafafa}
+.subj-td{padding:2px 3px;vertical-align:top}
+.subj-n{font-size:8pt;font-weight:700;line-height:1.4}
+.subj-l{font-size:6.5pt;color:#555}
 .empty-td{background:#f9f9f9}
 .jissi-td{border:1px solid #ccc}
-.kyushoku-row td{height:18px;background:#fff8e0}
+.kyushoku-row td{height:14mm;background:#fff8e0}
 .kyushoku-td{border:1px solid #ccc}
-.memo-row td{height:22px;background:#f7f7ff}
-.memo-td{border:1px solid #ccc}
-.biko-lbl,.biko-row td{height:26px;background:#fffdf0}
+.blank-row td{height:22mm;background:#fff}
+.blank-td{border:1px solid #bbb}
+.biko-lbl,.biko-row td{height:24mm;background:#fffdf0}
 .biko-lbl{writing-mode:vertical-rl;font-size:6pt}
 .biko-td{border:1px solid #bbb}
 .sum-td{width:40px;border:1px solid #888;background:#f8f9ff;vertical-align:top;padding:2px}
