@@ -75,6 +75,33 @@ function createCalendarEvents(jsonStr) {
         calendar.createEvent(title, startTime, endTime, options);
         count++;
       }
+
+      // 式などプリセット外に追加された授業（extraPeriod:true のエントリ）を処理
+      // 時刻は通常授業プリセット（id:'normal'）のスロットを参照する
+      const normalPreset = state.presets.find(function(p) { return p.id === 'normal'; }) ||
+                           state.presets.find(function(p) { return !p.id || p.id !== config.presetId; });
+      const NUMERIC_PERIODS = ['1','2','3','4','5','6'];
+      for (let ni = 0; ni < NUMERIC_PERIODS.length; ni++) {
+        const period = NUMERIC_PERIODS[ni];
+        if (visiblePeriods.indexOf(period) !== -1) continue; // 既に処理済み
+        const mapVal = periodMap[period];
+        if (!mapVal || typeof mapVal !== 'object' || !mapVal.extraPeriod) continue;
+
+        // 通常プリセットから時刻取得
+        const slot = normalPreset && normalPreset.slots && normalPreset.slots[period];
+        if (!slot || !slot.start || slot.start === slot.end) continue;
+
+        const subject = mapVal.subject || (period + '限');
+        const room = mapVal.room || '';
+        const startTime = gasParseTime(date, slot.start);
+        const endTime   = gasParseTime(date, slot.end);
+        const title = subject;
+        const options = { description: period + '限' + (room ? '　場所：' + room : '') };
+        if (room) options.location = room;
+
+        calendar.createEvent(title, startTime, endTime, options);
+        count++;
+      }
     }
     return { success: true, count: count };
   } catch(e) {
