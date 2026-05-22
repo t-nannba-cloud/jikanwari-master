@@ -600,7 +600,7 @@ function openPeriodMapModal(dateStr) {
       html += `<option value="${opt}" ${currentSel===opt?'selected':''}>${optLabel}の内容</option>`;
     }
     // プリセットに含まれない通常授業（1〜6限）を選択肢として追加
-    const NORMAL_PERIODS = ['1','2','3','4','5','6'];
+    const NORMAL_PERIODS = ['1','2','3','4'];
     for (const np of NORMAL_PERIODS) {
       if (visiblePeriods.includes(np)) continue;
       html += `<option value="${np}" ${currentSel===np?'selected':''}>${np}時間目の授業</option>`;
