@@ -1135,9 +1135,9 @@ function printWeekPlan(startDateStr, events) {
           if (cls) clsMap[cls] = s;
         }
         const clsDivs = ['A','B'].map(label => {
-          // "A" "Aクラス" "A組" など前方一致で探す
+          // クラス名付き予定（Aクラス/A組 など）があればそちらを優先、なければメイン教科を表示
           const matchKey = Object.keys(clsMap).find(k => k.startsWith(label));
-          const subj = matchKey ? clsMap[matchKey] : '';
+          const subj = matchKey ? clsMap[matchKey] : mainSubj;
           return `<div class="cls-line">${label}：${subj}</div>`;
         }).join('');
         return `<td class="subj-td">` +
