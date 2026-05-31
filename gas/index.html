@@ -1059,6 +1059,12 @@ function printWeekPlan(startDateStr, events) {
   for (const k of Object.keys(byDate)) {
     byDate[k].sort((a, b) => a.startStr.localeCompare(b.startStr));
   }
+  // 同一開始時刻のイベントをまとめた配列の配列（時限単位）
+  const byDateGrouped = {};
+  for (const ds of Object.keys(byDate)) {
+    const times = [...new Set(byDate[ds].map(e => e.startStr))].sort();
+    byDateGrouped[ds] = times.map(t => byDate[ds].filter(e => e.startStr === t));
+  }
 
   // 教科別集計
   const subjectCount = {};
@@ -1117,11 +1123,20 @@ function printWeekPlan(startDateStr, events) {
       `<td class="lbl-td" style="vertical-align:top;padding-top:3px"><div class="lbl-period">${pr.label}</div></td>` +
       weekDays.map(d => {
         const ds = formatDate(d);
-        const ev = byDate[ds] && byDate[ds][pi];
-        if (!ev) return `<td class="subj-td empty-td"></td>`;
-        const subj = ev.title.replace(/（[^）]*）/, '').trim();
-        const loc  = ev.location || '';
-        return `<td class="subj-td"><div class="subj-n">${subj}</div>${loc ? `<div class="subj-l">${loc}</div>` : ''}</td>`;
+        const group = byDateGrouped[ds] && byDateGrouped[ds][pi];
+        if (!group || !group.length) return `<td class="subj-td empty-td"></td>`;
+        const mainSubj = group[0].title.replace(/（[^）]*）/, '').trim();
+        const loc = group[0].location || '';
+        const clsInfo = group.map(e => {
+          const cls = (e.title.match(/（([^）]*)）/) || [])[1] || '';
+          const s = e.title.replace(/（[^）]*）/, '').trim();
+          return cls ? `${cls}:${s}` : '';
+        }).filter(Boolean).join('　');
+        return `<td class="subj-td">` +
+          `<div class="cell-top">` +
+          `<div class="subj-n">${mainSubj}${loc ? `<div class="subj-l">${loc}</div>` : ''}</div>` +
+          (clsInfo ? `<div class="subj-cls">${clsInfo}</div>` : '') +
+          `</div></td>`;
       }).join('') +
       appendSum +
       `</tr>`;
@@ -1175,8 +1190,10 @@ table.wp th,table.wp td{border:1px solid #888;vertical-align:middle;padding:0}
 .shutsu-sub{font-size:6pt;color:#666;text-align:right;padding-right:2px}
 .period-row td{height:28mm;vertical-align:top}
 .subj-td{padding:2px 3px}
+.cell-top{display:flex;justify-content:space-between;align-items:flex-start;gap:2px}
 .subj-n{font-size:8pt;font-weight:700;line-height:1.4}
-.subj-l{font-size:6.5pt;color:#555}
+.subj-l{font-size:6pt;color:#555;font-weight:400}
+.subj-cls{font-size:5.5pt;color:#444;text-align:right;white-space:nowrap;line-height:1.5;flex-shrink:0}
 .empty-td{background:#f9f9f9}
 .kyushoku-row td{height:12mm;background:#fff8e0}
 .kyushoku-td{border:1px solid #ccc}
