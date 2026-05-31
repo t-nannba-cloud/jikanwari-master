@@ -1127,15 +1127,18 @@ function printWeekPlan(startDateStr, events) {
         if (!group || !group.length) return `<td class="subj-td empty-td"></td>`;
         const mainSubj = group[0].title.replace(/（[^）]*）/, '').trim();
         const loc = group[0].location || '';
-        const clsInfo = group.map(e => {
-          const cls = (e.title.match(/（([^）]*)）/) || [])[1] || '';
-          const s = e.title.replace(/（[^）]*）/, '').trim();
-          return cls ? `${cls}:${s}` : '';
-        }).filter(Boolean).join('　');
+        const clsDivs = group
+          .map(e => {
+            const cls = (e.title.match(/（([^）]*)）/) || [])[1] || '';
+            const s = e.title.replace(/（[^）]*）/, '').trim();
+            return cls ? `<div class="cls-line">${cls}：${s}</div>` : '';
+          })
+          .filter(Boolean)
+          .join('');
         return `<td class="subj-td">` +
           `<div class="cell-top">` +
-          `<div class="subj-n">${mainSubj}${loc ? `<div class="subj-l">${loc}</div>` : ''}</div>` +
-          (clsInfo ? `<div class="subj-cls">${clsInfo}</div>` : '') +
+          `<div class="subj-main"><div class="subj-n">${mainSubj}</div>${loc ? `<div class="subj-l">${loc}</div>` : ''}</div>` +
+          (clsDivs ? `<div class="subj-cls">${clsDivs}</div>` : '') +
           `</div></td>`;
       }).join('') +
       appendSum +
@@ -1190,10 +1193,12 @@ table.wp th,table.wp td{border:1px solid #888;vertical-align:middle;padding:0}
 .shutsu-sub{font-size:6pt;color:#666;text-align:right;padding-right:2px}
 .period-row td{height:28mm;vertical-align:top!important}
 .subj-td{padding:2px 3px;vertical-align:top!important}
-.cell-top{display:flex;justify-content:space-between;align-items:flex-start;gap:2px}
+.cell-top{display:flex;justify-content:space-between;align-items:flex-start;gap:3px}
+.subj-main{flex:1;min-width:0}
 .subj-n{font-size:8pt;font-weight:700;line-height:1.4}
 .subj-l{font-size:6pt;color:#555;font-weight:400}
-.subj-cls{font-size:5.5pt;color:#444;text-align:right;white-space:nowrap;line-height:1.5;flex-shrink:0}
+.subj-cls{flex-shrink:0;text-align:right}
+.cls-line{font-size:5pt;color:#333;line-height:1.7;white-space:nowrap}
 .empty-td{background:#f9f9f9}
 .kyushoku-row td{height:12mm;background:#fff8e0}
 .kyushoku-td{border:1px solid #ccc}
