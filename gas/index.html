@@ -1085,12 +1085,12 @@ function printWeekPlan(startDateStr, events) {
     return `<th class="day-hd" style="color:${color}">${DOW_JP[dow]}<br><span class="day-date">${d.getMonth()+1}/${d.getDate()}</span></th>`;
   }).join('');
 
-  // 行数計算：5時限×2 + 給食×1 + 備考×1 = 12
+  // 行数計算：5時限×1 + 給食×1 + 備考×1 = 7
   const regularCount = PERIOD_ROWS.filter(p => !p.special).length;
   const specialCount = PERIOD_ROWS.filter(p => p.special).length;
-  const totalRows = regularCount * 2 + specialCount + 1;
+  const totalRows = regularCount + specialCount + 1;
 
-  // 教科別集計セル（最初の予定行に rowspan で結合）
+  // 教科別集計セル（最初の時限行に rowspan で結合）
   const sumTd = `<td class="sum-td" rowspan="${totalRows}">` +
     `<div class="sum-title">教科別<br>時数集計</div>` +
     Object.entries(subjectCount).map(([s,c]) =>
@@ -1110,11 +1110,11 @@ function printWeekPlan(startDateStr, events) {
         `</tr>`;
       continue;
     }
-    // 予定行（最初の行に集計列を追加）
+    // 時限行（予定・実施を統合、最初の行に集計列を追加）
     const appendSum = sumAdded ? '' : sumTd;
     sumAdded = true;
-    periodHtml += `<tr class="yotei-row">` +
-      `<td class="lbl-td yotei-lbl"><div class="lbl-period">${pr.label}</div><div class="lbl-sub">予定</div></td>` +
+    periodHtml += `<tr class="period-row">` +
+      `<td class="lbl-td" style="vertical-align:top;padding-top:3px"><div class="lbl-period">${pr.label}</div></td>` +
       weekDays.map(d => {
         const ds = formatDate(d);
         const ev = byDate[ds] && byDate[ds][pi];
@@ -1124,11 +1124,6 @@ function printWeekPlan(startDateStr, events) {
         return `<td class="subj-td"><div class="subj-n">${subj}</div>${loc ? `<div class="subj-l">${loc}</div>` : ''}</td>`;
       }).join('') +
       appendSum +
-      `</tr>`;
-    // 実施行
-    periodHtml += `<tr class="jissi-row">` +
-      `<td class="lbl-td jissi-lbl"><div class="lbl-sub">実施</div></td>` +
-      weekDays.map(() => `<td class="jissi-td"></td>`).join('') +
       `</tr>`;
     pi++;
   }
@@ -1178,13 +1173,11 @@ table.wp th,table.wp td{border:1px solid #888;vertical-align:middle;padding:0}
 .shutsu-row td,.tai-row td{height:7mm}
 .shutsu-td{padding:0 2px}
 .shutsu-sub{font-size:6pt;color:#666;text-align:right;padding-right:2px}
-.yotei-lbl,.yotei-row td{height:13mm}
-.jissi-lbl,.jissi-row td{height:13mm;background:#fafafa}
-.subj-td{padding:2px 3px;vertical-align:top}
+.period-row td{height:28mm;vertical-align:top}
+.subj-td{padding:2px 3px}
 .subj-n{font-size:8pt;font-weight:700;line-height:1.4}
 .subj-l{font-size:6.5pt;color:#555}
 .empty-td{background:#f9f9f9}
-.jissi-td{border:1px solid #ccc}
 .kyushoku-row td{height:12mm;background:#fff8e0}
 .kyushoku-td{border:1px solid #ccc}
 .blank-row td{height:18mm;background:#fff}
