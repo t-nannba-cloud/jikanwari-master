@@ -1057,8 +1057,8 @@ function printWeekPlan(startDateStr, events) {
     byDate[ev.dateStr].push(ev);
   }
 
-  // セル内容取得：日付・時限キー → {subject, room}（アプリの時間割＋時程変更を参照）
-  function getCellForPrint(ds, dow, periodKey) {
+  // セル内容取得：日付・時限キー・時間割 → {subject, room}（時程変更も反映）
+  function getCellForPrint(ds, dow, periodKey, timetable) {
     const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
     if (!dayKey) return null;
     const config = state.calendarConfig && state.calendarConfig[ds];
@@ -1067,15 +1067,20 @@ function printWeekPlan(startDateStr, events) {
     const mapVal = periodMap[periodKey];
     if (mapVal && typeof mapVal === 'object') return mapVal;
     const srcKey = typeof mapVal === 'string' ? mapVal : periodKey;
-    return state.timetable[dayKey] && state.timetable[dayKey][srcKey];
+    return timetable[dayKey] && timetable[dayKey][srcKey];
   }
 
-  // 教科別集計（アプリ時間割から計算）
+  const ttA = state.classes[0].timetable;
+  const ttB = state.classes[1].timetable;
+  const nameA = state.classes[0].name;
+  const nameB = state.classes[1].name;
+
+  // 教科別集計（Aクラス時間割から計算）
   const subjectCount = {};
   for (const d of weekDays) {
     const ds = formatDate(d);
     for (const pr of [{ key:'1' },{ key:'2' },{ key:'3' },{ key:'4' },{ key:'5' }]) {
-      const cell = getCellForPrint(ds, d.getDay(), pr.key);
+      const cell = getCellForPrint(ds, d.getDay(), pr.key, ttA);
       const subj = cell && cell.subject ? cell.subject : '';
       if (subj) subjectCount[subj] = (subjectCount[subj] || 0) + 1;
     }
@@ -1129,14 +1134,20 @@ function printWeekPlan(startDateStr, events) {
       `<td class="lbl-td" style="vertical-align:top;padding-top:3px"><div class="lbl-period">${pr.label}</div></td>` +
       weekDays.map(d => {
         const ds = formatDate(d);
-        const cell = getCellForPrint(ds, d.getDay(), pr.key);
-        const subj = cell && cell.subject ? cell.subject : '';
-        if (!subj) return `<td class="subj-td empty-td"></td>`;
-        const room = cell && cell.room ? cell.room : '';
-        const clsDivs = `<div class="cls-line">A：${subj}</div><div class="cls-line">B：${subj}</div>`;
+        const dow = d.getDay();
+        const cellA = getCellForPrint(ds, dow, pr.key, ttA);
+        const cellB = getCellForPrint(ds, dow, pr.key, ttB);
+        const subjA = cellA && cellA.subject ? cellA.subject : '';
+        const subjB = cellB && cellB.subject ? cellB.subject : '';
+        const mainSubj = subjA || subjB;
+        if (!mainSubj) return `<td class="subj-td empty-td"></td>`;
+        const room = (cellA && cellA.room) || (cellB && cellB.room) || '';
+        const clsDivs =
+          `<div class="cls-line">${nameA}：${subjA}</div>` +
+          `<div class="cls-line">${nameB}：${subjB}</div>`;
         return `<td class="subj-td">` +
           `<div class="cell-top">` +
-          `<div class="subj-main"><div class="subj-n">${subj}</div>${room ? `<div class="subj-l">${room}</div>` : ''}</div>` +
+          `<div class="subj-main"><div class="subj-n">${mainSubj}</div>${room ? `<div class="subj-l">${room}</div>` : ''}</div>` +
           `<div class="subj-cls">${clsDivs}</div>` +
           `</div></td>`;
       }).join('') +
