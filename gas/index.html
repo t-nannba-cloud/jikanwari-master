@@ -1068,7 +1068,6 @@ function printWeekPlan(startDateStr, events) {
   }
 
   const PERIOD_ROWS = [
-    { key: 'blank_pre',  special: 'blank' },
     { key: '1', label: '第1時' },
     { key: 'kyushoku',   special: 'kyushoku' },
     { key: '2', label: '第2時' },
@@ -1086,28 +1085,23 @@ function printWeekPlan(startDateStr, events) {
     return `<th class="day-hd" style="color:${color}">${DOW_JP[dow]}<br><span class="day-date">${d.getMonth()+1}/${d.getDate()}</span></th>`;
   }).join('');
 
-  // 行数計算：出退×2 + 4時限×2 + (メモ×2+給食×1)×1 + 備考×1 = 14
+  // 行数計算：5時限×2 + 給食×1 + 備考×1 = 12
   const regularCount = PERIOD_ROWS.filter(p => !p.special).length;
   const specialCount = PERIOD_ROWS.filter(p => p.special).length;
-  const totalRows = 2 + regularCount * 2 + specialCount + 1;
+  const totalRows = regularCount * 2 + specialCount + 1;
 
-  // 出退勤行
-  const shutsuRow = `<tr class="shutsu-row">` +
-    `<td class="lbl-td" rowspan="2"><div class="lbl-vt">出退勤</div></td>` +
-    weekDays.map(() => `<td class="shutsu-td"><div class="shutsu-sub">出</div></td>`).join('') +
-    `<td class="sum-td" rowspan="${totalRows}">` +
+  // 教科別集計セル（最初の予定行に rowspan で結合）
+  const sumTd = `<td class="sum-td" rowspan="${totalRows}">` +
     `<div class="sum-title">教科別<br>時数集計</div>` +
     Object.entries(subjectCount).map(([s,c]) =>
       `<div class="sum-entry"><span class="sum-s">${s}</span><span class="sum-c">${c}</span></div>`
     ).join('') +
-    `</td></tr>`;
-  const taiRow = `<tr class="tai-row">` +
-    weekDays.map(() => `<td class="shutsu-td"><div class="shutsu-sub">退</div></td>`).join('') +
-    `</tr>`;
+    `</td>`;
 
   // 時限行
   let periodHtml = '';
   let pi = 0;
+  let sumAdded = false;
   for (const pr of PERIOD_ROWS) {
     if (pr.special === 'kyushoku') {
       periodHtml += `<tr class="kyushoku-row">` +
@@ -1116,14 +1110,9 @@ function printWeekPlan(startDateStr, events) {
         `</tr>`;
       continue;
     }
-    if (pr.special === 'blank') {
-      periodHtml += `<tr class="blank-row">` +
-        `<td class="lbl-td"></td>` +
-        weekDays.map(() => `<td class="blank-td"></td>`).join('') +
-        `</tr>`;
-      continue;
-    }
-    // 予定行
+    // 予定行（最初の行に集計列を追加）
+    const appendSum = sumAdded ? '' : sumTd;
+    sumAdded = true;
     periodHtml += `<tr class="yotei-row">` +
       `<td class="lbl-td yotei-lbl"><div class="lbl-period">${pr.label}</div><div class="lbl-sub">予定</div></td>` +
       weekDays.map(d => {
@@ -1134,6 +1123,7 @@ function printWeekPlan(startDateStr, events) {
         const loc  = ev.location || '';
         return `<td class="subj-td"><div class="subj-n">${subj}</div>${loc ? `<div class="subj-l">${loc}</div>` : ''}</td>`;
       }).join('') +
+      appendSum +
       `</tr>`;
     // 実施行
     periodHtml += `<tr class="jissi-row">` +
@@ -1242,7 +1232,6 @@ table.btm td{border:1px solid #888;height:14mm;vertical-align:top;padding:2px 3p
       <th class="sum-hd">教科別<br>時数集計</th>
     </tr></thead>
     <tbody>
-      ${shutsuRow}${taiRow}
       ${periodHtml}
       ${bikoRow}
     </tbody>
