@@ -1050,27 +1050,35 @@ function printWeekPlan(startDateStr, events) {
   const weekDays = days.slice(0, 6); // 月〜土
   const sunday   = days[6];
 
-  // イベントを日付×時刻でグループ化・ソート
+  // 日曜イベントのみカレンダーから取得（sun-bar用）
   const byDate = {};
   for (const ev of events) {
     if (!byDate[ev.dateStr]) byDate[ev.dateStr] = [];
     byDate[ev.dateStr].push(ev);
   }
-  for (const k of Object.keys(byDate)) {
-    byDate[k].sort((a, b) => a.startStr.localeCompare(b.startStr));
-  }
-  // 同一開始時刻のイベントをまとめた配列の配列（時限単位）
-  const byDateGrouped = {};
-  for (const ds of Object.keys(byDate)) {
-    const times = [...new Set(byDate[ds].map(e => e.startStr))].sort();
-    byDateGrouped[ds] = times.map(t => byDate[ds].filter(e => e.startStr === t));
+
+  // セル内容取得：日付・時限キー → {subject, room}（アプリの時間割＋時程変更を参照）
+  function getCellForPrint(ds, dow, periodKey) {
+    const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
+    if (!dayKey) return null;
+    const config = state.calendarConfig && state.calendarConfig[ds];
+    if (!config || !config.presetId) return null;
+    const periodMap = config.periodMap || {};
+    const mapVal = periodMap[periodKey];
+    if (mapVal && typeof mapVal === 'object') return mapVal;
+    const srcKey = typeof mapVal === 'string' ? mapVal : periodKey;
+    return state.timetable[dayKey] && state.timetable[dayKey][srcKey];
   }
 
-  // 教科別集計
+  // 教科別集計（アプリ時間割から計算）
   const subjectCount = {};
-  for (const ev of events) {
-    const subj = ev.title.replace(/（[^）]*）/, '').trim();
-    if (subj) subjectCount[subj] = (subjectCount[subj] || 0) + 1;
+  for (const d of weekDays) {
+    const ds = formatDate(d);
+    for (const pr of [{ key:'1' },{ key:'2' },{ key:'3' },{ key:'4' },{ key:'5' }]) {
+      const cell = getCellForPrint(ds, d.getDay(), pr.key);
+      const subj = cell && cell.subject ? cell.subject : '';
+      if (subj) subjectCount[subj] = (subjectCount[subj] || 0) + 1;
+    }
   }
 
   const PERIOD_ROWS = [
@@ -1106,7 +1114,6 @@ function printWeekPlan(startDateStr, events) {
 
   // 時限行
   let periodHtml = '';
-  let pi = 0;
   let sumAdded = false;
   for (const pr of PERIOD_ROWS) {
     if (pr.special === 'kyushoku') {
@@ -1116,39 +1123,25 @@ function printWeekPlan(startDateStr, events) {
         `</tr>`;
       continue;
     }
-    // 時限行（予定・実施を統合、最初の行に集計列を追加）
     const appendSum = sumAdded ? '' : sumTd;
     sumAdded = true;
     periodHtml += `<tr class="period-row">` +
       `<td class="lbl-td" style="vertical-align:top;padding-top:3px"><div class="lbl-period">${pr.label}</div></td>` +
       weekDays.map(d => {
         const ds = formatDate(d);
-        const group = byDateGrouped[ds] && byDateGrouped[ds][pi];
-        if (!group || !group.length) return `<td class="subj-td empty-td"></td>`;
-        const mainSubj = group[0].title.replace(/（[^）]*）/, '').trim();
-        const loc = group[0].location || '';
-        // クラス名をキーにした教科マップ（例：Aクラス→数学）
-        const clsMap = {};
-        for (const e of group) {
-          const cls = (e.title.match(/（([^）]*)）/) || [])[1] || '';
-          const s = e.title.replace(/（[^）]*）/, '').trim();
-          if (cls) clsMap[cls] = s;
-        }
-        const clsDivs = ['A','B'].map(label => {
-          // クラス名付き予定（Aクラス/A組 など）があればそちらを優先、なければメイン教科を表示
-          const matchKey = Object.keys(clsMap).find(k => k.startsWith(label));
-          const subj = matchKey ? clsMap[matchKey] : mainSubj;
-          return `<div class="cls-line">${label}：${subj}</div>`;
-        }).join('');
+        const cell = getCellForPrint(ds, d.getDay(), pr.key);
+        const subj = cell && cell.subject ? cell.subject : '';
+        if (!subj) return `<td class="subj-td empty-td"></td>`;
+        const room = cell && cell.room ? cell.room : '';
+        const clsDivs = `<div class="cls-line">A：${subj}</div><div class="cls-line">B：${subj}</div>`;
         return `<td class="subj-td">` +
           `<div class="cell-top">` +
-          `<div class="subj-main"><div class="subj-n">${mainSubj}</div>${loc ? `<div class="subj-l">${loc}</div>` : ''}</div>` +
+          `<div class="subj-main"><div class="subj-n">${subj}</div>${room ? `<div class="subj-l">${room}</div>` : ''}</div>` +
           `<div class="subj-cls">${clsDivs}</div>` +
           `</div></td>`;
       }).join('') +
       appendSum +
       `</tr>`;
-    pi++;
   }
 
   // 備考行
