@@ -1127,18 +1127,23 @@ function printWeekPlan(startDateStr, events) {
         if (!group || !group.length) return `<td class="subj-td empty-td"></td>`;
         const mainSubj = group[0].title.replace(/（[^）]*）/, '').trim();
         const loc = group[0].location || '';
-        const clsDivs = group
-          .map(e => {
-            const cls = (e.title.match(/（([^）]*)）/) || [])[1] || '';
-            const s = e.title.replace(/（[^）]*）/, '').trim();
-            return cls ? `<div class="cls-line">${cls}：${s}</div>` : '';
-          })
-          .filter(Boolean)
-          .join('');
+        // クラス名をキーにした教科マップ（例：Aクラス→数学）
+        const clsMap = {};
+        for (const e of group) {
+          const cls = (e.title.match(/（([^）]*)）/) || [])[1] || '';
+          const s = e.title.replace(/（[^）]*）/, '').trim();
+          if (cls) clsMap[cls] = s;
+        }
+        const clsDivs = ['A','B'].map(label => {
+          // "A" "Aクラス" "A組" など前方一致で探す
+          const matchKey = Object.keys(clsMap).find(k => k.startsWith(label));
+          const subj = matchKey ? clsMap[matchKey] : '';
+          return `<div class="cls-line">${label}：${subj}</div>`;
+        }).join('');
         return `<td class="subj-td">` +
           `<div class="cell-top">` +
           `<div class="subj-main"><div class="subj-n">${mainSubj}</div>${loc ? `<div class="subj-l">${loc}</div>` : ''}</div>` +
-          (clsDivs ? `<div class="subj-cls">${clsDivs}</div>` : '') +
+          `<div class="subj-cls">${clsDivs}</div>` +
           `</div></td>`;
       }).join('') +
       appendSum +
