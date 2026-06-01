@@ -1141,15 +1141,15 @@ function printWeekPlan(startDateStr, events) {
         const cellB = getCellForPrint(ds, dow, pr.key, ttB);
         const subjA = cellA && cellA.subject ? cellA.subject : '';
         const subjB = cellB && cellB.subject ? cellB.subject : '';
-        const mainSubj = (cellSelf && cellSelf.subject) || subjA || subjB || '';
-        if (!mainSubj) return `<td class="subj-td empty-td"></td>`;
-        const room = (cellSelf && cellSelf.room) || (cellA && cellA.room) || (cellB && cellB.room) || '';
+        const selfSubj = cellSelf && cellSelf.subject ? cellSelf.subject : '';
+        if (!selfSubj && !subjA && !subjB) return `<td class="subj-td empty-td"></td>`;
+        const room = selfSubj ? ((cellSelf && cellSelf.room) || '') : '';
         const clsDivs =
           `<div class="cls-line">${nameA}：${subjA}</div>` +
           `<div class="cls-line">${nameB}：${subjB}</div>`;
         return `<td class="subj-td">` +
           `<div class="cell-top">` +
-          `<div class="subj-main"><div class="subj-n">${mainSubj}</div>${room ? `<div class="subj-l">${room}</div>` : ''}</div>` +
+          `<div class="subj-main">${selfSubj ? `<div class="subj-n">${selfSubj}</div>` : ''}${room ? `<div class="subj-l">${room}</div>` : ''}</div>` +
           `<div class="subj-cls">${clsDivs}</div>` +
           `</div></td>`;
       }).join('') +
