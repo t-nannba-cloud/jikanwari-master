@@ -1137,13 +1137,13 @@ function printWeekPlan(startDateStr, events) {
         const ds = formatDate(d);
         const dow = d.getDay();
         const cellSelf = getCellForPrint(ds, dow, pr.key, ttSelf);
-        const mainSubj = cellSelf && cellSelf.subject ? cellSelf.subject : '';
-        if (!mainSubj) return `<td class="subj-td empty-td"></td>`;
-        const room = cellSelf && cellSelf.room ? cellSelf.room : '';
         const cellA = getCellForPrint(ds, dow, pr.key, ttA);
         const cellB = getCellForPrint(ds, dow, pr.key, ttB);
         const subjA = cellA && cellA.subject ? cellA.subject : '';
         const subjB = cellB && cellB.subject ? cellB.subject : '';
+        const mainSubj = (cellSelf && cellSelf.subject) || subjA || subjB || '';
+        if (!mainSubj) return `<td class="subj-td empty-td"></td>`;
+        const room = (cellSelf && cellSelf.room) || (cellA && cellA.room) || (cellB && cellB.room) || '';
         const clsDivs =
           `<div class="cls-line">${nameA}：${subjA}</div>` +
           `<div class="cls-line">${nameB}：${subjB}</div>`;
