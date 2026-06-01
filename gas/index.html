@@ -1070,17 +1070,18 @@ function printWeekPlan(startDateStr, events) {
     return timetable[dayKey] && timetable[dayKey][srcKey];
   }
 
+  const ttSelf = state.timetable;
   const ttA = state.classes[0].timetable;
   const ttB = state.classes[1].timetable;
   const nameA = state.classes[0].name;
   const nameB = state.classes[1].name;
 
-  // 教科別集計（Aクラス時間割から計算）
+  // 教科別集計（自分の時間割から計算）
   const subjectCount = {};
   for (const d of weekDays) {
     const ds = formatDate(d);
     for (const pr of [{ key:'1' },{ key:'2' },{ key:'3' },{ key:'4' },{ key:'5' }]) {
-      const cell = getCellForPrint(ds, d.getDay(), pr.key, ttA);
+      const cell = getCellForPrint(ds, d.getDay(), pr.key, ttSelf);
       const subj = cell && cell.subject ? cell.subject : '';
       if (subj) subjectCount[subj] = (subjectCount[subj] || 0) + 1;
     }
@@ -1135,13 +1136,14 @@ function printWeekPlan(startDateStr, events) {
       weekDays.map(d => {
         const ds = formatDate(d);
         const dow = d.getDay();
+        const cellSelf = getCellForPrint(ds, dow, pr.key, ttSelf);
+        const mainSubj = cellSelf && cellSelf.subject ? cellSelf.subject : '';
+        if (!mainSubj) return `<td class="subj-td empty-td"></td>`;
+        const room = cellSelf && cellSelf.room ? cellSelf.room : '';
         const cellA = getCellForPrint(ds, dow, pr.key, ttA);
         const cellB = getCellForPrint(ds, dow, pr.key, ttB);
         const subjA = cellA && cellA.subject ? cellA.subject : '';
         const subjB = cellB && cellB.subject ? cellB.subject : '';
-        const mainSubj = subjA || subjB;
-        if (!mainSubj) return `<td class="subj-td empty-td"></td>`;
-        const room = (cellA && cellA.room) || (cellB && cellB.room) || '';
         const clsDivs =
           `<div class="cls-line">${nameA}：${subjA}</div>` +
           `<div class="cls-line">${nameB}：${subjB}</div>`;
