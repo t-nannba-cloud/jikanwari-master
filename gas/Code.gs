@@ -115,6 +115,37 @@ function gasParseTime(date, timeStr) {
   return d;
 }
 
+function getMonthEvents(yearMonthStr) {
+  try {
+    const parts = yearMonthStr.split('-').map(Number);
+    const year = parts[0], month = parts[1];
+    const start = new Date(year, month - 1, 1, 0, 0, 0);
+    const end   = new Date(year, month, 1, 0, 0, 0);
+    const calendars = CalendarApp.getCalendarsByName('授業');
+    if (!calendars || calendars.length === 0) {
+      return { success: false, error: '「授業」カレンダーが見つかりません' };
+    }
+    const events = calendars[0].getEvents(start, end);
+    const result = [];
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      const st = ev.getStartTime();
+      const et = ev.getEndTime();
+      result.push({
+        title:       ev.getTitle(),
+        description: ev.getDescription() || '',
+        location:    ev.getLocation() || '',
+        dateStr:  Utilities.formatDate(st, 'Asia/Tokyo', 'yyyy-MM-dd'),
+        startStr: Utilities.formatDate(st, 'Asia/Tokyo', 'HH:mm'),
+        endStr:   Utilities.formatDate(et, 'Asia/Tokyo', 'HH:mm'),
+      });
+    }
+    return { success: true, events: result };
+  } catch(e) {
+    return { success: false, error: e.toString() };
+  }
+}
+
 function getWeekEvents(startDateStr) {
   try {
     const parts = startDateStr.split('-').map(Number);

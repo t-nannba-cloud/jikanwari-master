@@ -998,13 +998,14 @@ function renderPrintTab() {
   html += `</select>
       <button class="btn btn-primary" onclick="printMonthlyFromTab(0)">${c0name}を印刷</button>
       <button class="btn btn-primary" onclick="printMonthlyFromTab(1)">${c1name}を印刷</button>
+      <button class="btn btn-secondary" onclick="loadMonthWeekPlans()">週案（自分）1ヶ月分を印刷</button>
     </div>
   </div>`;
 
   // 週案
   html += `<div class="subject-manager" style="margin-top:12px">
     <h3>週案（自分）</h3>
-    <p style="font-size:12px;color:#888;margin-bottom:12px">授業カレンダーから読み取ってA4横の週案形式で出力します</p>
+    <p style="font-size:12px;color:#888;margin-bottom:12px">授業カレンダーから読み取ってA4縦の週案形式で出力します</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <label style="font-size:13px">週の開始日（月曜日）：</label>
       <input type="date" id="weekPlanStart" style="padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
@@ -1037,27 +1038,21 @@ function loadWeekPlan() {
     .getWeekEvents(startEl.value);
 }
 
-function printWeekPlan(startDateStr, events) {
+function buildWeekPageHtml(startDateStr, allEvents) {
   const DOW_JP = ['日','月','火','水','木','金','土'];
   const startDate = new Date(startDateStr + 'T00:00:00');
-
-  // 月〜日の7日分（月曜起点）
   const days = Array.from({length: 7}, (_, i) => {
-    const d = new Date(startDate);
-    d.setDate(startDate.getDate() + i);
-    return d;
+    const d = new Date(startDate); d.setDate(startDate.getDate() + i); return d;
   });
-  const weekDays = days.slice(0, 6); // 月〜土
-  const sunday   = days[6];
+  const weekDays = days.slice(0, 6);
+  const sunday = days[6];
 
-  // 日曜イベントのみカレンダーから取得（sun-bar用）
   const byDate = {};
-  for (const ev of events) {
+  for (const ev of allEvents) {
     if (!byDate[ev.dateStr]) byDate[ev.dateStr] = [];
     byDate[ev.dateStr].push(ev);
   }
 
-  // セル内容取得：日付・時限キー・時間割 → {subject, room}（時程変更も反映）
   function getCellForPrint(ds, dow, periodKey, timetable) {
     const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
     if (!dayKey) return null;
@@ -1065,7 +1060,6 @@ function printWeekPlan(startDateStr, events) {
     if (!config || !config.presetId) return null;
     const periodMap = config.periodMap || {};
     const mapVal = periodMap[periodKey];
-    // プリセットのvisiblePeriodsに含まれない時限は、periodMapで明示的に追加された場合のみ表示
     const preset = state.presets.find(function(p) { return p.id === config.presetId; });
     const visiblePeriods = preset ? (preset.visiblePeriods || []) : [];
     if (!visiblePeriods.includes(periodKey) && mapVal === undefined) return null;
@@ -1080,7 +1074,6 @@ function printWeekPlan(startDateStr, events) {
   const nameA = state.classes[0].name;
   const nameB = state.classes[1].name;
 
-  // 教科別集計（自分の時間割から計算）
   const subjectCount = {};
   for (const d of weekDays) {
     const ds = formatDate(d);
@@ -1093,14 +1086,13 @@ function printWeekPlan(startDateStr, events) {
 
   const PERIOD_ROWS = [
     { key: '1', label: '第1時' },
-    { key: 'kyushoku',   special: 'kyushoku' },
+    { key: 'kyushoku', special: 'kyushoku' },
     { key: '2', label: '第2時' },
     { key: '3', label: '第3時' },
     { key: '4', label: '第4時' },
     { key: '5', label: '第5時' },
   ];
 
-  // ヘッダー行（月〜土）
   const dayHeaders = weekDays.map(d => {
     const ds = formatDate(d);
     const dow = d.getDay();
@@ -1109,28 +1101,23 @@ function printWeekPlan(startDateStr, events) {
     return `<th class="day-hd" style="color:${color}">${DOW_JP[dow]}<br><span class="day-date">${d.getMonth()+1}/${d.getDate()}</span></th>`;
   }).join('');
 
-  // 行数計算：5時限×1 + 給食×1 + 備考×1 = 7
   const regularCount = PERIOD_ROWS.filter(p => !p.special).length;
   const specialCount = PERIOD_ROWS.filter(p => p.special).length;
   const totalRows = regularCount + specialCount + 1;
 
-  // 教科別集計セル（最初の時限行に rowspan で結合）
   const sumTd = `<td class="sum-td" rowspan="${totalRows}">` +
     `<div class="sum-title">教科別<br>時数集計</div>` +
     Object.entries(subjectCount).map(([s,c]) =>
       `<div class="sum-entry"><span class="sum-s">${s}</span><span class="sum-c">${c}</span></div>`
-    ).join('') +
-    `</td>`;
+    ).join('') + `</td>`;
 
-  // 時限行
   let periodHtml = '';
   let sumAdded = false;
   for (const pr of PERIOD_ROWS) {
     if (pr.special === 'kyushoku') {
       periodHtml += `<tr class="kyushoku-row">` +
         `<td class="lbl-td" style="font-size:7pt;text-align:center;writing-mode:vertical-rl">給食</td>` +
-        weekDays.map(() => `<td class="kyushoku-td"></td>`).join('') +
-        `</tr>`;
+        weekDays.map(() => `<td class="kyushoku-td"></td>`).join('') + `</tr>`;
       continue;
     }
     const appendSum = sumAdded ? '' : sumTd;
@@ -1148,26 +1135,15 @@ function printWeekPlan(startDateStr, events) {
         const selfSubj = cellSelf && cellSelf.subject ? cellSelf.subject : '';
         if (!selfSubj && !subjA && !subjB) return `<td class="subj-td empty-td"></td>`;
         const room = selfSubj ? ((cellSelf && cellSelf.room) || '') : '';
-        const clsDivs =
-          `<div class="cls-line">${nameA}：${subjA}</div>` +
-          `<div class="cls-line">${nameB}：${subjB}</div>`;
-        return `<td class="subj-td">` +
-          `<div class="cell-top">` +
-          `<div class="subj-main">${selfSubj ? `<div class="subj-n">${selfSubj}</div>` : ''}${room ? `<div class="subj-l">${room}</div>` : ''}</div>` +
-          `<div class="subj-cls">${clsDivs}</div>` +
-          `</div></td>`;
-      }).join('') +
-      appendSum +
-      `</tr>`;
+        const clsDivs = `<div class="cls-line">${nameA}：${subjA}</div><div class="cls-line">${nameB}：${subjB}</div>`;
+        return `<td class="subj-td"><div class="cell-top"><div class="subj-main">${selfSubj ? `<div class="subj-n">${selfSubj}</div>` : ''}${room ? `<div class="subj-l">${room}</div>` : ''}</div><div class="subj-cls">${clsDivs}</div></div></td>`;
+      }).join('') + appendSum + `</tr>`;
   }
 
-  // 備考行
   const bikoRow = `<tr class="biko-row">` +
     `<td class="lbl-td biko-lbl"><div class="lbl-vt">備考</div></td>` +
-    weekDays.map(() => `<td class="biko-td"></td>`).join('') +
-    `</tr>`;
+    weekDays.map(() => `<td class="biko-td"></td>`).join('') + `</tr>`;
 
-  // 日曜行
   const sunDs = formatDate(sunday);
   const sunEvs = byDate[sunDs] || [];
   const sunRow = `<div class="sun-bar">` +
@@ -1180,10 +1156,38 @@ function printWeekPlan(startDateStr, events) {
   const s = weekDays[0], e = weekDays[5];
   const weekLabel = `${s.getFullYear()}年　${s.getMonth()+1}月${s.getDate()}日（${DOW_JP[s.getDay()]}）〜${e.getMonth()+1}月${e.getDate()}日（${DOW_JP[e.getDay()]}）`;
 
-  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
-<title>週案</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
+  return `<div class="page">
+  <div class="pg-top">
+    <div style="width:37mm"></div>
+    <div><div class="pg-title">週　案</div><div class="pg-week">${weekLabel}</div></div>
+    <div class="stamps">
+      <div class="stamp-box"><div class="stamp-lbl">校長</div></div>
+      <div class="stamp-box"><div class="stamp-lbl">教頭</div></div>
+      <div class="stamp-box"><div class="stamp-lbl">本人</div></div>
+    </div>
+  </div>
+  <table class="wp">
+    <thead><tr>
+      <th class="lbl-hd"></th>
+      ${dayHeaders}
+      <th class="sum-hd">教科別<br>時数集計</th>
+    </tr></thead>
+    <tbody>
+      ${periodHtml}
+      ${bikoRow}
+    </tbody>
+  </table>
+  ${sunRow}
+  <table class="btm">
+    <tr><td></td><td></td></tr>
+    <tr><td></td><td></td></tr>
+    <tr><td></td><td></td></tr>
+  </table>
+</div>`;
+}
+
+function getWeekPlanCSS() {
+  return `*{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,'Hiragino Sans','Meiryo',sans-serif;background:#fff}
 .print-btn{padding:6px 18px;background:#4361ee;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin:8px}
 .page{width:194mm;padding:8mm}
@@ -1233,48 +1237,57 @@ table.wp th,table.wp td{border:1px solid #888;vertical-align:middle;padding:0}
 table.btm{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:2mm}
 table.btm td{border:1px solid #888;height:14mm;vertical-align:top;padding:2px 3px}
 @page{size:A4 portrait;margin:0}
-@media screen{
-  body{background:#ccc;padding:10mm}
-  .page{background:#fff;margin:0 auto;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+@media screen{body{background:#ccc;padding:10mm}.page{background:#fff;margin:0 auto;box-shadow:0 2px 8px rgba(0,0,0,.3)}}
+@media print{body{background:#fff;padding:0}.print-btn{display:none}.page{width:210mm;padding:8mm;page-break-after:always}-webkit-print-color-adjust:exact;print-color-adjust:exact}`;
 }
-@media print{
-  body{background:#fff;padding:0}
-  .print-btn{display:none}
-  .page{width:210mm;padding:8mm}
-  -webkit-print-color-adjust:exact;print-color-adjust:exact
-}
-</style></head><body>
-<div style="text-align:center;margin:6px"><button class="print-btn" onclick="window.print()">印刷する（A4縦）</button></div>
-<div class="page">
-  <div class="pg-top">
-    <div style="width:37mm"></div>
-    <div><div class="pg-title">週　案</div><div class="pg-week">${weekLabel}</div></div>
-    <div class="stamps">
-      <div class="stamp-box"><div class="stamp-lbl">校長</div></div>
-      <div class="stamp-box"><div class="stamp-lbl">教頭</div></div>
-      <div class="stamp-box"><div class="stamp-lbl">本人</div></div>
-    </div>
-  </div>
-  <table class="wp">
-    <thead><tr>
-      <th class="lbl-hd"></th>
-      ${dayHeaders}
-      <th class="sum-hd">教科別<br>時数集計</th>
-    </tr></thead>
-    <tbody>
-      ${periodHtml}
-      ${bikoRow}
-    </tbody>
-  </table>
-  ${sunRow}
-  <table class="btm">
-    <tr><td></td><td></td></tr>
-    <tr><td></td><td></td></tr>
-    <tr><td></td><td></td></tr>
-  </table>
-</div>
-</body></html>`;
 
+function printWeekPlan(startDateStr, events) {
+  const pageHtml = buildWeekPageHtml(startDateStr, events);
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>週案</title><style>${getWeekPlanCSS()}</style></head><body>
+<div style="text-align:center;margin:6px"><button class="print-btn" onclick="window.print()">印刷する（A4縦）</button></div>
+${pageHtml}
+</body></html>`;
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+function loadMonthWeekPlans() {
+  const y = parseInt(document.getElementById('printYear').value);
+  const m = parseInt(document.getElementById('printMonth').value);
+  const statusEl = document.getElementById('weekPlanStatus');
+  statusEl.textContent = '読み込み中...';
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (!result.success) { statusEl.textContent = 'エラー：' + result.error; return; }
+      statusEl.textContent = result.events.length + '件のイベントを取得しました';
+      printMonthWeekPlans(y, m, result.events);
+    })
+    .withFailureHandler(function(err) { statusEl.textContent = 'エラー：' + (err.message || err); })
+    .getMonthEvents(y + '-' + String(m).padStart(2, '0'));
+}
+
+function printMonthWeekPlans(year, month, allEvents) {
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
+  const firstMonday = new Date(firstDay);
+  firstMonday.setDate(firstDay.getDate() - ((firstDay.getDay() + 6) % 7));
+  const mondays = [];
+  let mon = new Date(firstMonday);
+  while (mon <= lastDay) {
+    mondays.push(new Date(mon));
+    mon.setDate(mon.getDate() + 7);
+  }
+  const pages = mondays.map((m, i) => {
+    const pageHtml = buildWeekPageHtml(formatDate(m), allEvents);
+    return i < mondays.length - 1
+      ? pageHtml.replace('class="page"', 'class="page" style="page-break-after:always"')
+      : pageHtml;
+  }).join('\n');
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>週案 ${year}年${month}月</title><style>${getWeekPlanCSS()}</style></head><body>
+<div style="text-align:center;margin:6px"><button class="print-btn" onclick="window.print()">印刷する（A4縦）</button></div>
+${pages}
+</body></html>`;
   const w = window.open('', '_blank');
   w.document.write(html);
   w.document.close();
