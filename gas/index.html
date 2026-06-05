@@ -1166,8 +1166,8 @@ function buildWeekPageHtml(startDateStr, allEvents) {
         const ds = formatDate(d);
         const dow = d.getDay();
         const cellSelf = getCellForPrint(ds, dow, pr.key, ttSelf);
-        const cellA = getCellForPrint(ds, dow, pr.key, ttA, 'periodMapA');
-        const cellB = getCellForPrint(ds, dow, pr.key, ttB, 'periodMapB');
+        const cellA = getCellForPrint(ds, dow, pr.key, ttSelf, 'periodMapA');
+        const cellB = getCellForPrint(ds, dow, pr.key, ttSelf, 'periodMapB');
         const subjA = cellA && cellA.subject ? cellA.subject : '';
         const subjB = cellB && cellB.subject ? cellB.subject : '';
         const selfSubj = cellSelf && cellSelf.subject ? cellSelf.subject : '';
