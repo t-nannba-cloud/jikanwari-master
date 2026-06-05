@@ -1065,6 +1065,10 @@ function printWeekPlan(startDateStr, events) {
     if (!config || !config.presetId) return null;
     const periodMap = config.periodMap || {};
     const mapVal = periodMap[periodKey];
+    // プリセットのvisiblePeriodsに含まれない時限は、periodMapで明示的に追加された場合のみ表示
+    const preset = state.presets.find(function(p) { return p.id === config.presetId; });
+    const visiblePeriods = preset ? (preset.visiblePeriods || []) : [];
+    if (!visiblePeriods.includes(periodKey) && mapVal === undefined) return null;
     if (mapVal && typeof mapVal === 'object') return mapVal;
     const srcKey = typeof mapVal === 'string' ? mapVal : periodKey;
     return timetable[dayKey] && timetable[dayKey][srcKey];
