@@ -998,7 +998,6 @@ function renderPrintTab() {
   html += `</select>
       <button class="btn btn-primary" onclick="printMonthlyFromTab(0)">${c0name}を印刷</button>
       <button class="btn btn-primary" onclick="printMonthlyFromTab(1)">${c1name}を印刷</button>
-      <button class="btn btn-secondary" onclick="loadMonthWeekPlans()">週案（自分）1ヶ月分を印刷</button>
     </div>
   </div>`;
 
@@ -1010,6 +1009,7 @@ function renderPrintTab() {
       <label style="font-size:13px">週の開始日（月曜日）：</label>
       <input type="date" id="weekPlanStart" style="padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
       <button class="btn btn-primary" onclick="loadWeekPlan()">週案を生成</button>
+      <button class="btn btn-secondary" onclick="loadMonthWeekPlans()">1ヶ月分を印刷</button>
     </div>
     <div id="weekPlanStatus" style="margin-top:8px;font-size:13px;color:#888"></div>
   </div>`;
