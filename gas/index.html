@@ -486,7 +486,9 @@ function renderCalendar() {
       }
       html += '</select>';
       if (config && config.presetId) {
-        const hasMap = config.periodMap && Object.keys(config.periodMap).length > 0;
+        const hasMap = (config.periodMap && Object.keys(config.periodMap).length > 0) ||
+                       (config.periodMapA && Object.keys(config.periodMapA).length > 0) ||
+                       (config.periodMapB && Object.keys(config.periodMapB).length > 0);
         html += `<div onclick="openPeriodMapModal('${dateStr}')" style="font-size:10px;color:${hasMap?'#e63946':'#4361ee'};cursor:pointer;margin-top:2px">${hasMap?'⚡変更中':'＋変更'}</div>`;
       }
     }
@@ -563,25 +565,20 @@ function clearCell() {
 function setDayPreset(dateStr, presetId) {
   if (!state.calendarConfig[dateStr]) state.calendarConfig[dateStr] = {};
   state.calendarConfig[dateStr].presetId = presetId || null;
-  if (!presetId) delete state.calendarConfig[dateStr].periodMap;
+  if (!presetId) {
+    delete state.calendarConfig[dateStr].periodMap;
+    delete state.calendarConfig[dateStr].periodMapA;
+    delete state.calendarConfig[dateStr].periodMapB;
+  }
   saveState(); renderCalendar();
 }
 
 let editingDateStr = null;
-function openPeriodMapModal(dateStr) {
-  editingDateStr = dateStr;
-  const config = state.calendarConfig[dateStr];
-  const preset = config && config.presetId ? state.presets.find(p => p.id === config.presetId) : null;
-  if (!preset) return;
-  const periodMap = config.periodMap || {};
-  const visiblePeriods = preset.visiblePeriods || ALL_PERIODS.filter(p => p !== '6');
-  const parts = dateStr.split('-');
-  const dow = new Date(dateStr).getDay();
-  const dowName = ['日','月','火','水','木','金','土'][dow];
-  document.getElementById('periodMapTitle').textContent = `${parseInt(parts[1])}/${parseInt(parts[2])}（${dowName}）の時間割変更`;
 
-  let html = '';
-  // 既存のプリセット時限行
+function buildPeriodMapSection(prefix, sectionTitle, periodMap, visiblePeriods, preset, highlighted) {
+  const bgColor = highlighted ? '#fff3cd' : '#eef';
+  let html = `<div style="margin-bottom:16px">
+    <div style="font-weight:700;font-size:13px;margin-bottom:8px;padding:4px 8px;background:${bgColor};border-radius:4px">${sectionTitle}</div>`;
   for (const period of visiblePeriods) {
     const slot = preset.slots[period];
     const label = slot ? slot.label : period + '限';
@@ -593,13 +590,12 @@ function openPeriodMapModal(dateStr) {
     html += `<div style="margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="min-width:60px;font-size:13px;font-weight:600">${label}枠</span>
-        <select id="pmap_${period}" onchange="onPeriodMapChange('${period}')" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">`;
+        <select id="${prefix}pmap_${period}" onchange="onPeriodMapChange('${prefix}','${period}')" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">`;
     for (const opt of visiblePeriods) {
       const optSlot = preset.slots[opt];
       const optLabel = optSlot ? optSlot.label : opt + '限';
       html += `<option value="${opt}" ${currentSel===opt?'selected':''}>${optLabel}の内容</option>`;
     }
-    // プリセットに含まれない通常授業（1〜6限）を選択肢として追加
     const NORMAL_PERIODS = ['1','2','3','4'];
     for (const np of NORMAL_PERIODS) {
       if (visiblePeriods.includes(np)) continue;
@@ -608,40 +604,25 @@ function openPeriodMapModal(dateStr) {
     html += `<option value="__custom__" ${isCustom?'selected':''}>記述式</option>
         </select>
       </div>
-      <div id="pmap_custom_${period}" style="margin-top:6px;margin-left:68px;display:${isCustom?'flex':'none'};gap:6px">
-        <input type="text" id="pmap_subject_${period}" placeholder="教科名" value="${escHtml(customSubject)}" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-        <input type="text" id="pmap_room_${period}" placeholder="場所" value="${escHtml(customRoom)}" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+      <div id="${prefix}pmap_custom_${period}" style="margin-top:6px;margin-left:68px;display:${isCustom?'flex':'none'};gap:6px">
+        <input type="text" id="${prefix}pmap_subject_${period}" placeholder="教科名" value="${escHtml(customSubject)}" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+        <input type="text" id="${prefix}pmap_room_${period}" placeholder="場所" value="${escHtml(customRoom)}" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px">
       </div>
     </div>`;
   }
+  html += `</div>`;
+  return html;
+}
 
-  document.getElementById('periodMapBody').innerHTML = html;
-  document.getElementById('periodMapModal').style.display = 'flex';
-}
-function onPeriodMapChange(period) {
-  const sel = document.getElementById('pmap_' + period);
-  const customDiv = document.getElementById('pmap_custom_' + period);
-  if (customDiv) customDiv.style.display = sel.value === '__custom__' ? 'flex' : 'none';
-}
-function closePeriodMapModal() {
-  document.getElementById('periodMapModal').style.display = 'none';
-  editingDateStr = null;
-}
-function savePeriodMap() {
-  if (!editingDateStr) return;
-  const config = state.calendarConfig[editingDateStr];
-  const preset = state.presets.find(p => p.id === config.presetId);
-  const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PERIODS.filter(p => p !== '6')) : [];
+function collectPeriodMapFromDom(prefix, visiblePeriods) {
   const periodMap = {};
   let hasChange = false;
-
-  // 通常プリセット時限の変更を収集
   for (const period of visiblePeriods) {
-    const el = document.getElementById('pmap_' + period);
+    const el = document.getElementById(prefix + 'pmap_' + period);
     if (!el) continue;
     if (el.value === '__custom__') {
-      const subject = (document.getElementById('pmap_subject_' + period) || {}).value || '';
-      const room = (document.getElementById('pmap_room_' + period) || {}).value || '';
+      const subject = (document.getElementById(prefix + 'pmap_subject_' + period) || {}).value || '';
+      const room = (document.getElementById(prefix + 'pmap_room_' + period) || {}).value || '';
       periodMap[period] = { subject: subject.trim(), room: room.trim() };
       hasChange = true;
     } else if (el.value !== period) {
@@ -649,13 +630,67 @@ function savePeriodMap() {
       hasChange = true;
     }
   }
+  return hasChange ? periodMap : {};
+}
 
-  config.periodMap = hasChange ? periodMap : {};
+function openPeriodMapModal(dateStr) {
+  editingDateStr = dateStr;
+  const config = state.calendarConfig[dateStr];
+  const preset = config && config.presetId ? state.presets.find(p => p.id === config.presetId) : null;
+  if (!preset) return;
+  const visiblePeriods = preset.visiblePeriods || ALL_PERIODS.filter(p => p !== '6');
+  const parts = dateStr.split('-');
+  const dow = new Date(dateStr).getDay();
+  const dowName = ['日','月','火','水','木','金','土'][dow];
+  document.getElementById('periodMapTitle').textContent = `${parseInt(parts[1])}/${parseInt(parts[2])}（${dowName}）の時間割変更`;
+
+  let html = '';
+  if (preset.id === 'exam') {
+    html += buildPeriodMapSection('self_', '自分', config.periodMap || {}, visiblePeriods, preset, false);
+    html += buildPeriodMapSection('classA_', state.classes[0].name, config.periodMapA || {}, visiblePeriods, preset, true);
+    html += buildPeriodMapSection('classB_', state.classes[1].name, config.periodMapB || {}, visiblePeriods, preset, true);
+  } else {
+    html += buildPeriodMapSection('self_', '', config.periodMap || {}, visiblePeriods, preset, false);
+  }
+
+  document.getElementById('periodMapBody').innerHTML = html;
+  document.getElementById('periodMapModal').style.display = 'flex';
+}
+
+function onPeriodMapChange(prefixOrPeriod, periodOrUndefined) {
+  const prefix = periodOrUndefined !== undefined ? prefixOrPeriod : '';
+  const period = periodOrUndefined !== undefined ? periodOrUndefined : prefixOrPeriod;
+  const sel = document.getElementById(prefix + 'pmap_' + period);
+  const customDiv = document.getElementById(prefix + 'pmap_custom_' + period);
+  if (customDiv) customDiv.style.display = sel.value === '__custom__' ? 'flex' : 'none';
+}
+
+function closePeriodMapModal() {
+  document.getElementById('periodMapModal').style.display = 'none';
+  editingDateStr = null;
+}
+
+function savePeriodMap() {
+  if (!editingDateStr) return;
+  const config = state.calendarConfig[editingDateStr];
+  const preset = state.presets.find(p => p.id === config.presetId);
+  const visiblePeriods = preset ? (preset.visiblePeriods || ALL_PERIODS.filter(p => p !== '6')) : [];
+
+  config.periodMap = collectPeriodMapFromDom('self_', visiblePeriods);
+  if (preset && preset.id === 'exam') {
+    config.periodMapA = collectPeriodMapFromDom('classA_', visiblePeriods);
+    config.periodMapB = collectPeriodMapFromDom('classB_', visiblePeriods);
+  }
   saveState(); closePeriodMapModal(); renderCalendar();
 }
+
 function clearPeriodMap() {
   if (!editingDateStr) return;
-  if (state.calendarConfig[editingDateStr]) delete state.calendarConfig[editingDateStr].periodMap;
+  if (state.calendarConfig[editingDateStr]) {
+    delete state.calendarConfig[editingDateStr].periodMap;
+    delete state.calendarConfig[editingDateStr].periodMapA;
+    delete state.calendarConfig[editingDateStr].periodMapB;
+  }
   saveState(); closePeriodMapModal(); renderCalendar();
 }
 function calPrev() { if(calMonth===1){calMonth=12;calYear--;}else calMonth--; renderCalendar(); }
@@ -1053,15 +1088,18 @@ function buildWeekPageHtml(startDateStr, allEvents) {
     byDate[ev.dateStr].push(ev);
   }
 
-  function getCellForPrint(ds, dow, periodKey, timetable) {
+  function getCellForPrint(ds, dow, periodKey, timetable, pmapKey) {
     const dayKey = dow >= 1 && dow <= 6 ? DAYS[dow - 1] : null;
     if (!dayKey) return null;
     const config = state.calendarConfig && state.calendarConfig[ds];
     if (!config || !config.presetId) return null;
-    const periodMap = config.periodMap || {};
-    const mapVal = periodMap[periodKey];
     const preset = state.presets.find(function(p) { return p.id === config.presetId; });
     const visiblePeriods = preset ? (preset.visiblePeriods || []) : [];
+    // テスト日程かつクラス別periodMapが指定されていればそちらを優先
+    const periodMap = (pmapKey && config.presetId === 'exam' && config[pmapKey])
+      ? config[pmapKey]
+      : (config.periodMap || {});
+    const mapVal = periodMap[periodKey];
     if (!visiblePeriods.includes(periodKey) && mapVal === undefined) return null;
     if (mapVal && typeof mapVal === 'object') return mapVal;
     const srcKey = typeof mapVal === 'string' ? mapVal : periodKey;
@@ -1128,8 +1166,8 @@ function buildWeekPageHtml(startDateStr, allEvents) {
         const ds = formatDate(d);
         const dow = d.getDay();
         const cellSelf = getCellForPrint(ds, dow, pr.key, ttSelf);
-        const cellA = getCellForPrint(ds, dow, pr.key, ttA);
-        const cellB = getCellForPrint(ds, dow, pr.key, ttB);
+        const cellA = getCellForPrint(ds, dow, pr.key, ttA, 'periodMapA');
+        const cellB = getCellForPrint(ds, dow, pr.key, ttB, 'periodMapB');
         const subjA = cellA && cellA.subject ? cellA.subject : '';
         const subjB = cellB && cellB.subject ? cellB.subject : '';
         const selfSubj = cellSelf && cellSelf.subject ? cellSelf.subject : '';
